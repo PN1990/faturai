@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FaturaAI — Declaração Periódica IVA · Madeira</title>
-<link rel="manifest" href="/faturai/manifest.json">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1a3a2a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="FaturaAI">
-<link rel="apple-touch-icon" href="/faturai/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Syne+Mono&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -24,17 +24,17 @@
   --p1:#1a3a2a;--p2:#7b2d8b;
   --radius:10px;--shadow:0 2px 12px rgba(0,0,0,.07)
 }
-html,body{max-width:100vw;overflow-x:hidden}body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+body{font-family:'Lato',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 
 /* ── NAV ── */
-nav{background:var(--accent);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;gap:1rem;width:100%;box-sizing:border-box;overflow:hidden}
+nav{background:var(--accent);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;gap:1rem}
 .nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;display:flex;align-items:center;gap:.5rem;white-space:nowrap}
 .nav-badge{background:var(--gold);color:#fff;font-size:.6rem;padding:.12rem .45rem;border-radius:999px;font-family:'Syne Mono',monospace}
-.nav-center{display:flex;align-items:center;gap:.25rem;flex-shrink:1;overflow:hidden}
+.nav-center{display:flex;align-items:center;gap:.25rem}
 .nav-tab{padding:0 .9rem;height:56px;display:flex;align-items:center;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.5);cursor:pointer;border-bottom:3px solid transparent;transition:all .15s;font-family:'Syne',sans-serif;border:none;background:none;white-space:nowrap}
 .nav-tab:hover{color:rgba(255,255,255,.85)}
 .nav-tab.active{color:#fff;border-bottom:3px solid var(--gold)}
-.nav-right{display:flex;align-items:center;gap:.6rem;flex-shrink:0;flex-shrink:0;flex-wrap:nowrap}
+.nav-right{display:flex;align-items:center;gap:.6rem;flex-shrink:0}
 .api-wrap{display:flex;align-items:center;gap:.35rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.25rem .65rem}
 .api-wrap input{background:none;border:none;outline:none;color:#fff;font-family:'Syne Mono',monospace;font-size:.7rem;width:160px}
 .api-wrap input::placeholder{color:rgba(255,255,255,.3)}
@@ -43,9 +43,9 @@ nav{background:var(--accent);padding:0 1.5rem;display:flex;align-items:center;ju
 .db-dot.ok{background:#5db87a}.db-dot.err{background:#e05c5c}
 
 /* ── PERFIL SWITCHER ── */
-.perfil-bar{background:var(--surface);border-bottom:2px solid var(--border);padding:.6rem 1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;width:100%;box-sizing:border-box;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.perfil-bar{background:var(--surface);border-bottom:2px solid var(--border);padding:.6rem 1.5rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
 .perfil-label{font-family:'Syne',sans-serif;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-.perfil-btns{display:flex;gap:.5rem;flex-wrap:wrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:100%}
+.perfil-btns{display:flex;gap:.5rem;flex-wrap:wrap}
 .pbtn{display:flex;align-items:center;gap:.5rem;padding:.38rem .9rem;border-radius:999px;border:2px solid var(--border);background:var(--bg);cursor:pointer;font-family:'Syne',sans-serif;font-size:.8rem;font-weight:700;color:var(--muted);transition:all .18s}
 .pbtn:hover{border-color:var(--accent);color:var(--accent)}
 .pbtn.active{color:#fff;border-color:transparent}
@@ -55,7 +55,7 @@ nav{background:var(--accent);padding:0 1.5rem;display:flex;align-items:center;ju
 
 /* ── PAGES ── */
 .page{display:none}.page.active{display:block}
-.container{max-width:1220px;margin:0 auto;padding:1.5rem 1.5rem;width:100%;box-sizing:border-box}
+.container{max-width:1220px;margin:0 auto;padding:1.5rem 1.5rem}
 .page-header{margin-bottom:1.5rem;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:.8rem}
 .page-title{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;letter-spacing:-.5px;color:var(--accent)}
 .page-subtitle{font-size:.82rem;color:var(--muted);margin-top:.12rem}
@@ -201,246 +201,17 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
 .empty-icon{font-size:2rem;margin-bottom:.55rem}
 .empty-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;color:var(--text);margin-bottom:.2rem}
 .preview-img{max-width:100%;max-height:120px;border-radius:8px;object-fit:contain;border:1px solid var(--border);margin-top:.35rem}
-/* LOGIN SCREEN */
-.login-screen{position:fixed;inset:0;background:var(--accent);z-index:500;display:flex;align-items:center;justify-content:center;padding:1.5rem}
-.login-box{background:var(--surface);border-radius:18px;width:100%;max-width:400px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:mIn .3s ease}
-.login-hd{padding:2rem 2rem 1.2rem;text-align:center;background:var(--accent)}
-.login-logo{margin-bottom:.85rem}
-.login-logo img{height:52px;width:auto;filter:brightness(0) invert(1);opacity:.92}
-.login-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;letter-spacing:-.3px}
-.login-sub{font-size:.78rem;color:rgba(255,255,255,.6);margin-top:.25rem;font-family:'Syne Mono',monospace}
-.login-body{padding:1.75rem 2rem}
-.login-profiles{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.25rem}
-.lp-btn{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;border-radius:10px;border:2px solid var(--border);background:var(--bg);cursor:pointer;transition:all .18s;text-align:left}
-.lp-btn:hover{border-color:var(--accent);background:var(--accent-light)}
-.lp-btn.selected{border-color:var(--accent);background:var(--accent-light)}
-.lp-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
-.lp-name{font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;color:var(--accent)}
-.lp-nif{font-family:'Syne Mono',monospace;font-size:.7rem;color:var(--muted)}
-.login-pw-wrap{margin-bottom:1rem}
-.login-pw-label{font-family:'Syne',sans-serif;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:.4rem;display:block}
-.login-pw-input{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:.7rem 1rem;font-family:'Syne Mono',monospace;font-size:1rem;color:var(--text);outline:none;transition:border-color .15s}
-.login-pw-input:focus{border-color:var(--accent)}
-.login-err{color:var(--danger);font-size:.78rem;text-align:center;margin-bottom:.75rem;font-family:'Syne',sans-serif;font-weight:700;min-height:1.2rem}
-.login-btn{width:100%;padding:.82rem;background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:.88rem;cursor:pointer;transition:background .15s;letter-spacing:.3px}
-.login-btn:hover{background:var(--accent2)}
-.login-btn:disabled{opacity:.4;cursor:not-allowed}
-.login-footer{text-align:center;padding:.85rem 2rem 1.5rem;font-size:.72rem;color:var(--muted);font-family:'Syne Mono',monospace}
-/* SESSION badge */
-.session-badge{display:flex;align-items:center;gap:.4rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.25rem .65rem;cursor:pointer;transition:background .15s}
-.session-badge:hover{background:rgba(255,255,255,.18)}
-.session-name{font-family:'Syne',sans-serif;font-weight:700;font-size:.75rem;color:#fff}
-.session-dot{width:7px;height:7px;border-radius:50%}
-/* DUPLICATE WARNING */
-.dup-card{background:var(--danger-light);border:1.5px solid rgba(192,57,43,.25);border-radius:10px;padding:.9rem 1rem;margin-bottom:.85rem}
-.dup-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;color:var(--danger);margin-bottom:.4rem}
-.dup-row{display:flex;gap:.6rem;font-size:.78rem;color:var(--text);margin-bottom:.2rem}
-.dup-lbl{color:var(--muted);min-width:80px}
-/* PROFILE ACTIONS */
-.pbtn-actions{display:flex;gap:.25rem;margin-left:.2rem}
-.pbtn-action{background:none;border:none;cursor:pointer;font-size:.75rem;opacity:.5;padding:.1rem .25rem;transition:opacity .15s;line-height:1}
-.pbtn-action:hover{opacity:1}
-/* BATCH QUEUE */
-.queue-wrap{display:flex;flex-direction:column;gap:.4rem;max-height:320px;overflow-y:auto;margin-bottom:.85rem}
-.qrow{display:flex;align-items:center;gap:.7rem;padding:.65rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;transition:all .2s}
-.qrow.processing{background:var(--accent-light);border-color:rgba(26,58,42,.3)}
-.qrow.done{background:var(--success-light);border-color:rgba(45,92,66,.3);opacity:.7}
-.qrow.error{background:var(--danger-light);border-color:rgba(192,57,43,.3)}
-.qrow.waiting{opacity:.55}
-.q-icon{font-size:1.1rem;flex-shrink:0;width:22px;text-align:center}
-.q-name{flex:1;font-size:.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.q-status{font-size:.7rem;font-family:'Syne Mono',monospace;color:var(--muted);white-space:nowrap}
-.q-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
-.progress-bar-wrap{height:4px;background:var(--border);border-radius:2px;margin:.6rem 0}
-.progress-bar{height:4px;background:var(--accent2);border-radius:2px;transition:width .4s ease}
-/* TABS inside upload card */
-.upload-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.1rem}
-.upload-tab{padding:.55rem 1.1rem;font-family:'Syne',sans-serif;font-weight:700;font-size:.78rem;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
-.upload-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-.upload-pane{display:none}.upload-pane.active{display:block}
 .abar{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap}
 .color-pick{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.4rem}
 .cp{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
 .cp.sel{border-color:#fff;box-shadow:0 0 0 2px var(--text)}
-
-/* ══════════════════════════════════════
-   RESPONSIVE — TABLET (≤900px)
-══════════════════════════════════════ */
-@media(max-width:900px){
-  .upload-layout,.decl-layout,.edit-grid{grid-template-columns:1fr}
-  .decl-grid{grid-template-columns:1fr 1fr}
-  .summary-card{position:static}
-  nav{padding:0 .75rem}
-  .container{padding:1rem}
-  .api-wrap input{width:110px}
-  .perfil-bar{padding:.5rem .75rem}
-}
-
-/* ══════════════════════════════════════
-   RESPONSIVE — MOBILE (≤600px)
-══════════════════════════════════════ */
-@media(max-width:600px){
-  html,body{overflow-x:hidden !important;max-width:100vw !important}
-
-  /* NAV */
-  nav{height:50px;padding:0 .7rem;gap:.3rem;width:100vw;box-sizing:border-box}
-  .nav-logo{flex-shrink:0}
-  .nav-logo img{height:22px}
-  .nav-badge{display:none}
-  .nav-center{flex:1;gap:0;justify-content:flex-start;overflow:hidden;min-width:0}
-  .nav-tab{padding:0 .4rem;font-size:.6rem;letter-spacing:0;height:50px;white-space:nowrap;flex-shrink:0}
-  .nav-right{flex-shrink:0;gap:.25rem;display:flex;align-items:center;min-width:0}
-  .api-wrap{display:none}
-  .db-status{display:none}
-  .session-badge{padding:.15rem .35rem;flex-shrink:1;min-width:0;max-width:90px}
-  .session-name{font-size:.6rem;max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-  /* PERFIL BAR */
-  .perfil-bar{padding:.45rem .75rem;gap:.5rem;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .perfil-bar::-webkit-scrollbar{display:none}
-  .perfil-label{display:none}
-  .pbtn{font-size:.72rem;padding:.28rem .65rem;white-space:nowrap;flex-shrink:0}
-  .pbtn-add{flex-shrink:0}
-  #perfilNif{display:none}
-
-  /* CONTAINER */
-  .container{padding:.75rem;width:100%;box-sizing:border-box}
-  .page-header{flex-direction:column;align-items:flex-start;gap:.6rem;margin-bottom:1rem}
-  .page-title{font-size:1.1rem}
-  .page-subtitle{font-size:.75rem}
-  .abar{flex-wrap:wrap;gap:.4rem}
-
-  /* CARDS */
-  .card-header{padding:.65rem .85rem;flex-wrap:wrap;gap:.35rem}
-  .card-body{padding:.85rem}
-  .card-title{font-size:.7rem}
-
-  /* UPLOAD TABS */
-  .upload-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;scrollbar-width:none}
-  .upload-tabs::-webkit-scrollbar{display:none}
-  .upload-tab{padding:.5rem .85rem;font-size:.72rem}
-  .upload-layout{grid-template-columns:1fr;gap:.75rem}
-  .type-toggle{gap:.3rem}
-  .type-btn{font-size:.72rem;padding:.38rem .5rem}
-  .drop-zone{min-height:110px;padding:1rem .75rem}
-  .drop-icon{font-size:1.3rem}
-  .drop-label{font-size:.8rem}
-
-  /* EDIT GRID — single column on mobile */
-  .edit-grid{grid-template-columns:1fr !important}
-  .edit-full{grid-column:1}
-
-  /* FILTERS */
-  .filters-bar{padding:.65rem .85rem;gap:.45rem}
-  .filter-search{font-size:.78rem;padding:.38rem .65rem}
-  .filter-chips{gap:.25rem}
-  .chip{padding:.25rem .6rem;font-size:.68rem}
-  .filter-sel{font-size:.74rem;padding:.32rem .55rem}
-
-  /* TABLE — card-style on mobile */
-  .ftable thead{display:none}
-  .ftable tr{display:block;border:1px solid var(--border);border-radius:10px;margin-bottom:.6rem;background:var(--surface);padding:.7rem .85rem;position:relative}
-  .ftable td{display:flex;justify-content:space-between;align-items:center;padding:.28rem 0;border:none;font-size:.8rem}
-  .ftable td:last-child{justify-content:flex-end;gap:.4rem;padding-top:.5rem;border-top:1px solid var(--border);margin-top:.3rem}
-  .ftable td::before{content:attr(data-label);font-size:.66rem;color:var(--muted);font-family:'Syne',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;margin-right:.5rem}
-  .ftable td:last-child::before{display:none}
-  .ftable tr:hover td{background:none}
-  .badge{font-size:.62rem}
-
-  /* DECLARAÇÃO */
-  .decl-layout{grid-template-columns:1fr;gap:.75rem}
-  .decl-grid{grid-template-columns:1fr}
-  .df{padding:.55rem .7rem}
-  .fn{width:20px;height:20px;font-size:.6rem;border-radius:4px}
-  .fl{font-size:.62rem}
-  .fv{font-size:.78rem}
-  .decl-sec{font-size:.6rem;padding:.4rem .7rem}
-  .period-row{flex-wrap:wrap;gap:.4rem}
-  .period-row select{font-size:.78rem;padding:.38rem .6rem}
-
-  /* CAMPO 96 */
-  .campo96-wrap{flex-direction:column;align-items:flex-start;gap:.5rem;padding:.75rem .85rem}
-  .campo96-input{width:100%}
-
-  /* SUMMARY */
-  .sum-row{font-size:.78rem;padding:.45rem 0}
-  .sum-total-val{font-size:1.25rem}
-
-  /* MODALS */
-  .modal{width:95vw !important;max-height:92vh;border-radius:12px}
-  .modal-hd{padding:.85rem 1rem}
-  .modal-title{font-size:.84rem}
-  .modal-body{padding:1rem}
-  .modal-ft{padding:.75rem 1rem;flex-wrap:wrap;gap:.4rem}
-  .modal-ft button{flex:1;justify-content:center;font-size:.76rem}
-
-  /* LOGIN */
-  .login-screen{padding:.75rem;align-items:flex-start;padding-top:2rem}
-  .login-box{border-radius:14px;max-height:95vh;overflow-y:auto}
-  .login-hd{padding:1.25rem 1.25rem .85rem}
-  .login-logo img{height:38px}
-  .login-title{font-size:1rem}
-  .login-body{padding:1.1rem 1.25rem}
-  .login-footer{padding:.55rem 1.25rem 1rem}
-  .lp-btn{padding:.6rem .85rem}
-
-  /* BATCH QUEUE */
-  .qrow{padding:.55rem .7rem}
-  .q-name{font-size:.75rem}
-  .q-status{font-size:.65rem}
-
-  /* BTNS */
-  .btn{font-size:.76rem;padding:.52rem .85rem}
-  .btn-sm{font-size:.68rem;padding:.3rem .6rem}
-  .btn-primary{padding:.72rem}
-
-  /* PAGE HEADER ACTIONS */
-  .page-header .abar{width:100%}
-  .page-header .abar .btn{flex:1;justify-content:center}
-  .page-header .period-row{width:100%}
-  .page-header select{flex:1}
-}
-
-/* ══════════════════════════════════════
-   MOBILE — Extra small (≤380px)
-══════════════════════════════════════ */
-@media(max-width:380px){
-  .nav-tab{font-size:.62rem;padding:0 .45rem}
-  .api-wrap{display:none}
-  .type-btn{font-size:.66rem;padding:.32rem .4rem}
-}
-
+@media(max-width:900px){.upload-layout,.decl-layout,.decl-grid,.edit-grid{grid-template-columns:1fr}.summary-card{position:static}nav{padding:0 .75rem}.container{padding:1rem}.api-wrap input{width:110px}.perfil-bar{padding:.5rem .75rem}}
 </style>
 </head>
 <body>
 
 <!-- LOADER -->
 <div class="loader-overlay" id="loaderOverlay"><div class="spinner"></div><div class="loader-text" id="loaderText">A processar…</div></div>
-
-<!-- MODAL: CONFIGURAÇÕES -->
-<div class="overlay" id="modalSettings">
-  <div class="modal" style="width:420px">
-    <div class="modal-hd" style="background:var(--accent)"><div class="modal-title">⚙️ Configurações</div></div>
-    <div class="modal-body">
-      <div class="edit-field" style="margin-bottom:1rem">
-        <label class="edit-label">🔑 Chave API Anthropic</label>
-        <input class="edit-input" type="password" id="apiKey" placeholder="sk-ant-api03-…" autocomplete="off" />
-        <span style="font-size:.7rem;color:var(--muted);margin-top:.3rem;display:block">
-          Obtém a tua chave em <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">console.anthropic.com</a>.<br>
-          Guardada localmente no browser — nunca enviada para servidores.
-        </span>
-      </div>
-      <div class="db-status" style="display:flex !important;gap:.5rem;align-items:center;padding:.65rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px">
-        <div class="db-dot" id="dbDot"></div>
-        <span id="dbLbl" style="font-size:.78rem;font-family:'Syne Mono',monospace">A verificar…</span>
-      </div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline btn-sm" onclick="fecharModal('modalSettings')">Fechar</button>
-      <button class="btn btn-primary btn-sm" style="width:auto" onclick="guardarApiKey()">💾 Guardar</button>
-    </div>
-  </div>
-</div>
 
 <!-- MODAL: NOTIFICAÇÕES -->
 <div class="overlay" id="modalNotif">
@@ -513,28 +284,6 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
   </div>
 </div>
 
-<!-- MODAL: DUPLICADO -->
-<div class="overlay" id="modalDup">
-  <div class="modal" style="width:460px">
-    <div class="modal-hd" style="background:var(--danger)"><div class="modal-title">⚠️ Possível fatura duplicada</div></div>
-    <div class="modal-body">
-      <div class="info-box gold">Já existe uma fatura com o mesmo número e fornecedor neste perfil. Verifica se não estás a carregar a mesma fatura duas vezes.</div>
-      <div class="dup-card">
-        <div class="dup-title">Fatura já existente:</div>
-        <div class="dup-row"><span class="dup-lbl">Fornecedor</span><strong id="dup_fornecedor">—</strong></div>
-        <div class="dup-row"><span class="dup-lbl">Nº Fatura</span><span id="dup_numero" class="mono">—</span></div>
-        <div class="dup-row"><span class="dup-lbl">Data</span><span id="dup_data">—</span></div>
-        <div class="dup-row"><span class="dup-lbl">Total</span><span id="dup_total" class="mono">—</span></div>
-      </div>
-      <div class="info-box green" style="margin-bottom:0">Se tens a certeza que é uma fatura diferente (ex: mesmo fornecedor, numeração reiniciada), podes guardar na mesma.</div>
-    </div>
-    <div class="modal-ft">
-      <button class="btn btn-outline btn-sm" onclick="fecharModal('modalDup');pendingF=null;pendingLinhas=[]">Cancelar — é duplicada</button>
-      <button class="btn btn-sm" style="background:var(--danger);color:#fff" onclick="fecharModal('modalDup');continuarAposVerificacao()">Guardar mesmo assim</button>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL: ESTRANGEIRA -->
 <div class="overlay" id="modalEstrang">
   <div class="modal">
@@ -594,22 +343,14 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <div class="edit-field edit-full"><label class="edit-label">Nome</label><input class="edit-input" id="pf_nome" placeholder="Ex: Pedro" /></div>
         <div class="edit-field edit-full"><label class="edit-label">NIF</label><input class="edit-input" id="pf_nif" placeholder="Ex: 218988338" /></div>
       </div>
-      <div class="edit-field edit-full" style="margin-top:.55rem">
-        <label class="edit-label">Password</label>
-        <input class="edit-input" id="pf_pw" type="password" placeholder="Nova password (deixa vazio para manter)" autocomplete="new-password" />
-        <span style="font-size:.68rem;color:var(--muted);margin-top:.2rem">Se não definires password, o perfil fica acessível sem código.</span>
-      </div>
-      <div class="edit-field" style="margin-top:.55rem">
+      <div class="edit-field" style="margin-top:.7rem">
         <label class="edit-label">Cor do perfil</label>
         <div class="color-pick" id="colorPick"></div>
       </div>
     </div>
-    <div class="modal-ft" style="justify-content:space-between">
-      <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" id="btnEliminarPerfil" onclick="eliminarPerfil()" style="display:none">🗑 Eliminar perfil</button>
-      <div style="display:flex;gap:.55rem">
-        <button class="btn btn-outline btn-sm" onclick="fecharModal('modalPerfil')">Cancelar</button>
-        <button class="btn btn-sm" style="background:#7b2d8b;color:#fff" onclick="guardarPerfil()">💾 Guardar Perfil</button>
-      </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline btn-sm" onclick="fecharModal('modalPerfil')">Cancelar</button>
+      <button class="btn btn-sm" style="background:#7b2d8b;color:#fff" onclick="guardarPerfil()">💾 Guardar Perfil</button>
     </div>
   </div>
 </div>
@@ -644,32 +385,6 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
   </div>
 </div>
 
-<!-- LOGIN SCREEN -->
-<div class="login-screen" id="loginScreen">
-  <div class="login-box">
-    <div class="login-hd">
-      <div class="login-logo">
-        <img src="data:image/png;base64,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" alt="PN Stays" />
-      </div>
-      <div class="login-title">FaturaAI</div>
-      <div class="login-sub">Declaração Periódica IVA · Madeira</div>
-    </div>
-    <div class="login-body">
-      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:.65rem">Seleciona o perfil</div>
-      <div class="login-profiles" id="loginProfiles">
-        <div style="text-align:center;padding:1rem;color:var(--muted);font-size:.82rem">A carregar perfis…</div>
-      </div>
-      <div class="login-pw-wrap" id="loginPwWrap" style="display:none">
-        <label class="login-pw-label">Password</label>
-        <input class="login-pw-input" type="password" id="loginPwInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" oninput="document.getElementById('loginErr').textContent=''" />
-      </div>
-      <div class="login-err" id="loginErr"></div>
-      <button class="login-btn" id="loginBtn" onclick="doLogin()" disabled>Entrar →</button>
-    </div>
-    <div class="login-footer">FaturaAI · PN Stays · Madeira</div>
-  </div>
-</div>
-
 <!-- NAV -->
 <nav>
   <div class="nav-logo"><img src="data:image/png;base64,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" alt="PN Stays" style="height:34px;width:auto;filter:brightness(0) invert(1);opacity:.92" /><span class="nav-badge" style="margin-left:.35rem">IVA</span></div>
@@ -679,8 +394,13 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
   </div>
   <div class="nav-right">
     <div class="db-status"><div class="db-dot" id="dbDot"></div><span id="dbLbl">BD…</span></div>
-
+    <div class="session-badge" id="sessionBadge" style="display:none" onclick="doLogout()">
+      <div class="session-dot" id="sessionDot"></div>
+      <span class="session-name" id="sessionName"></span>
+      <span style="font-size:.6rem;color:rgba(255,255,255,.5);margin-left:.2rem">· sair</span>
+    </div>
     <button id="btnNotif" class="btn btn-sm" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:.3rem .65rem;font-size:.8rem" onclick="toggleNotificacoes()" title="Notificações de prazo">🔔</button>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:.3rem .65rem;font-size:.8rem" onclick="abrirSettings()" title="Configurações">⚙️</button>
     <div class="api-wrap"><span>🔑</span><input type="password" id="apiKey" placeholder="sk-ant-…" /></div>
   </div>
 </nav>
@@ -702,98 +422,30 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
     <div class="card" style="margin-bottom:1.1rem">
       <div class="card-header"><span class="card-title">➕ Nova Fatura</span></div>
       <div class="card-body">
-        <!-- TABS -->
-        <div class="upload-tabs">
-          <button class="upload-tab active" onclick="showUploadTab('ia',this)">✦ IA — Uma fatura</button>
-          <button class="upload-tab" onclick="showUploadTab('batch',this)">📦 IA — Várias faturas</button>
-          <button class="upload-tab" onclick="showUploadTab('manual',this)">✏️ Manual</button>
-        </div>
-
-        <!-- PANE: IA SINGLE -->
-        <div class="upload-pane active" id="pane-ia">
-          <div class="upload-layout">
-            <div>
-              <div class="type-toggle">
-                <button class="type-btn av" id="btnV" onclick="setType('venda')">📤 Venda</button>
-                <button class="type-btn" id="btnC" onclick="setType('compra')">📥 Compra</button>
-                <button class="type-btn" id="btnN" onclick="setType('nota_credito')">↩️ N. Crédito</button>
-              </div>
-              <div class="drop-zone" id="dropZone" style="position:relative">
-                <input type="file" id="fileInput" accept="image/*,.pdf" />
-                <div class="drop-icon" id="dropIcon">📂</div>
-                <div class="drop-label" id="dropLabel">Arrasta ou clica para selecionar</div>
-                <div class="drop-sub">PNG · JPG · WEBP · PDF</div>
-                <img id="prevImg" class="preview-img" style="display:none" />
-              </div>
-              <!-- Camera button — only shown on mobile -->
-              <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" />
-              <button class="btn btn-outline" id="btnCamera" onclick="document.getElementById('cameraInput').click()" style="width:100%;margin-top:.5rem;display:none">
-                📷 Tirar foto com a câmara
-              </button>
+        <div class="upload-layout">
+          <div>
+            <div class="type-toggle">
+              <button class="type-btn av" id="btnV" onclick="setType('venda')">📤 Venda</button>
+              <button class="type-btn" id="btnC" onclick="setType('compra')">📥 Compra</button>
+              <button class="type-btn" id="btnN" onclick="setType('nota_credito')">↩️ N. Crédito</button>
             </div>
-            <div style="display:flex;flex-direction:column;gap:.85rem;justify-content:flex-end">
-              <div class="info-box green" style="margin-bottom:0">
-                <strong>ℹ️ Extração IA — Madeira 2025</strong><br>
-                Taxas: <strong>4%</strong> · <strong>12%</strong> · <strong>22%</strong><br>
-                Deteta prestações MEO/NOS<br>
-                Deteta faturas estrangeiras → Campo 16
-              </div>
-              <button class="btn btn-primary" onclick="extractData()">✦ Extrair com IA</button>
+            <div class="drop-zone" id="dropZone">
+              <input type="file" id="fileInput" accept="image/*,.pdf" />
+              <div class="drop-icon" id="dropIcon">📂</div>
+              <div class="drop-label" id="dropLabel">Arrasta ou clica para selecionar</div>
+              <div class="drop-sub">PNG · JPG · WEBP · PDF</div>
+              <img id="prevImg" class="preview-img" style="display:none" />
             </div>
           </div>
-        </div>
-
-        <!-- PANE: BATCH -->
-        <div class="upload-pane" id="pane-batch">
-          <div class="type-toggle" style="margin-bottom:.85rem">
-            <button class="type-btn av" id="batchBtnV" onclick="setBatchType('venda')">📤 Venda</button>
-            <button class="type-btn" id="batchBtnC" onclick="setBatchType('compra')">📥 Compra</button>
-            <button class="type-btn" id="batchBtnN" onclick="setBatchType('nota_credito')">↩️ N. Crédito</button>
-          </div>
-          <div class="drop-zone" id="batchDropZone" style="min-height:110px">
-            <input type="file" id="batchFileInput" accept="image/*,.pdf" multiple />
-            <div class="drop-icon">📂</div>
-            <div class="drop-label">Arrasta vários ficheiros aqui</div>
-            <div class="drop-sub">Podes selecionar múltiplos PDFs / imagens de uma vez</div>
-          </div>
-          <!-- Camera for batch — adds to queue -->
-          <input type="file" id="batchCameraInput" accept="image/*" capture="environment" style="display:none" />
-          <button class="btn btn-outline" id="btnBatchCamera" onclick="document.getElementById('batchCameraInput').click()" style="width:100%;margin-top:.5rem;display:none">
-            📷 Fotografar fatura
-          </button>
-          <div id="batchQueueWrap" style="display:none;margin-top:.85rem">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-              <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:.78rem;color:var(--accent)" id="batchProgress">0 / 0</span>
-              <div class="progress-bar-wrap" style="flex:1;margin:0 .85rem 0 .85rem"><div class="progress-bar" id="batchBar" style="width:0%"></div></div>
+          <div style="display:flex;flex-direction:column;gap:.85rem;justify-content:flex-end">
+            <div class="info-box green" style="margin-bottom:0">
+              <strong>ℹ️ Extração IA — Madeira 2025</strong><br>
+              Taxas: <strong>4%</strong> reduzida · <strong>12%</strong> intermédia · <strong>22%</strong> normal<br>
+              Deteta prestações MEO/NOS/NEC<br>
+              Deteta faturas estrangeiras → Campo 16
             </div>
-            <div class="queue-wrap" id="batchQueue"></div>
-            <button class="btn btn-primary" id="btnStartBatch" onclick="startBatch()">✦ Processar todas com IA</button>
+            <button class="btn btn-primary" onclick="extractData()">✦ Extrair Dados com IA</button>
           </div>
-        </div>
-
-        <!-- PANE: MANUAL -->
-        <div class="upload-pane" id="pane-manual">
-          <div class="type-toggle" style="margin-bottom:.85rem">
-            <button class="type-btn av" id="manBtnV" onclick="setManualType('venda')">📤 Venda</button>
-            <button class="type-btn" id="manBtnC" onclick="setManualType('compra')">📥 Compra</button>
-            <button class="type-btn" id="manBtnN" onclick="setManualType('nota_credito')">↩️ N. Crédito</button>
-          </div>
-          <div class="edit-grid" style="margin-bottom:.85rem">
-            <div class="edit-field"><label class="edit-label">Fornecedor *</label><input class="edit-input" id="man_fornecedor" placeholder="Nome do fornecedor" /></div>
-            <div class="edit-field"><label class="edit-label">NIF</label><input class="edit-input" id="man_nif" placeholder="123456789" /></div>
-            <div class="edit-field"><label class="edit-label">Nº Fatura *</label><input class="edit-input" id="man_numero" placeholder="FT 2026/001" /></div>
-            <div class="edit-field"><label class="edit-label">Data * (DD/MM/AAAA)</label><input class="edit-input" id="man_data" placeholder="01/01/2026" /></div>
-            <div class="edit-field"><label class="edit-label">Base 4% (€)</label><input class="edit-input" id="man_base_5" type="number" step="0.01" placeholder="0.00" oninput="calcManualIva()" /></div>
-            <div class="edit-field"><label class="edit-label">IVA 4% (€)</label><input class="edit-input" id="man_iva_5" type="number" step="0.01" placeholder="auto" /></div>
-            <div class="edit-field"><label class="edit-label">Base 12% (€)</label><input class="edit-input" id="man_base_12" type="number" step="0.01" placeholder="0.00" oninput="calcManualIva()" /></div>
-            <div class="edit-field"><label class="edit-label">IVA 12% (€)</label><input class="edit-input" id="man_iva_12" type="number" step="0.01" placeholder="auto" /></div>
-            <div class="edit-field"><label class="edit-label">Base 22% (€)</label><input class="edit-input" id="man_base_22" type="number" step="0.01" placeholder="0.00" oninput="calcManualIva()" /></div>
-            <div class="edit-field"><label class="edit-label">IVA 22% (€)</label><input class="edit-input" id="man_iva_22" type="number" step="0.01" placeholder="auto" /></div>
-            <div class="edit-field"><label class="edit-label">Base isenta (€)</label><input class="edit-input" id="man_base_isenta" type="number" step="0.01" placeholder="0.00" /></div>
-            <div class="edit-field"><label class="edit-label">Total fatura (€)</label><input class="edit-input" id="man_total" type="number" step="0.01" placeholder="0.00" /></div>
-          </div>
-          <div class="info-box green" style="margin-bottom:.85rem;font-size:.74rem">💡 O IVA é calculado automaticamente ao preencher a base. Podes corrigir manualmente.</div>
-          <button class="btn btn-primary" onclick="guardarManual()">💾 Guardar Fatura Manual</button>
         </div>
       </div>
     </div>
@@ -803,6 +455,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <div class="abar">
           <span id="fatCount" style="font-size:.72rem;color:var(--muted);font-family:'Syne Mono',monospace">—</span>
           <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇ CSV</button>
+          <button class="btn btn-outline btn-sm" onclick="exportBackup()" title="Backup completo de todas as faturas">💾 Backup</button>
           <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" onclick="clearAll()">🗑 Limpar</button>
         </div>
       </div>
@@ -838,13 +491,13 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
   <div class="container">
     <div class="page-header">
       <div><div class="page-title">Declaração Periódica de IVA</div><div class="page-subtitle" id="subtitleDecl">Regime Normal · Trimestral · Madeira</div></div>
-      <div class="abar" style="width:100%">
-        <div class="period-row" style="flex:1">
-          <select id="selAno" style="flex:1"><option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option></select>
-          <select id="selTrim" style="flex:2"><option value="1">1º Trim</option><option value="2">2º Trim</option><option value="3">3º Trim</option><option value="4">4º Trim</option></select>
-          <button class="btn btn-outline btn-sm" onclick="calcular()">🔄</button>
+      <div class="abar">
+        <div class="period-row">
+          <select id="selAno"><option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option></select>
+          <select id="selTrim"><option value="1">1º Trimestre</option><option value="2">2º Trimestre</option><option value="3">3º Trimestre</option><option value="4">4º Trimestre</option></select>
+          <button class="btn btn-outline btn-sm" onclick="calcular()">🔄 Recalcular</button>
         </div>
-        <button class="btn btn-gold btn-sm" onclick="exportPDF()" style="white-space:nowrap">📄 PDF</button>
+        <button class="btn btn-gold" onclick="exportPDF()">📄 Exportar PDF</button>
       </div>
     </div>
 
@@ -999,7 +652,6 @@ window.addEventListener('DOMContentLoaded',async()=>{
   document.getElementById('selAno').value=now.getFullYear();
   await carregarPerfis();
   await loadFaturas();
-  await initAuth();
   calcular();
 });
 
@@ -1025,16 +677,11 @@ async function carregarPerfis(){
 function renderPerfis(){
   const wrap=document.getElementById('perfilBtns');
   wrap.innerHTML=perfis.map(p=>`
-    <div style="display:flex;align-items:center;gap:0">
-      <button class="pbtn${perfilAtivo?.nif===p.nif?' active':''}" 
-        style="${perfilAtivo?.nif===p.nif?'background:'+p.cor+';border-color:'+p.cor:''};border-radius:999px 0 0 999px;border-right:none;padding-right:.6rem"
-        onclick="mudarPerfil('${p.nif}')">
-        <span class="pbtn-dot" style="background:${perfilAtivo?.nif===p.nif?'rgba(255,255,255,.7)':p.cor}"></span>${p.nome}
-      </button>
-      <div class="pbtn-actions" style="background:${perfilAtivo?.nif===p.nif?p.cor:'var(--bg)'};border:2px solid ${perfilAtivo?.nif===p.nif?p.cor:'var(--border)'};border-left:1px solid rgba(255,255,255,.2);border-radius:0 999px 999px 0;padding:.38rem .5rem;display:flex;gap:.1rem">
-        <button class="pbtn-action" title="Editar perfil" style="color:${perfilAtivo?.nif===p.nif?'rgba(255,255,255,.8)':'var(--muted)'}" onclick="abrirNovoPerfil('${p.nif}')">✏️</button>
-      </div>
-    </div>`).join('');
+    <button class="pbtn${perfilAtivo?.nif===p.nif?' active':''}" 
+      style="${perfilAtivo?.nif===p.nif?'background:'+p.cor+';border-color:'+p.cor:''}"
+      onclick="mudarPerfil('${p.nif}')">
+      <span class="pbtn-dot" style="background:${p.cor}"></span>${p.nome}
+    </button>`).join('');
   document.getElementById('perfilNif').textContent=perfilAtivo?'NIF: '+perfilAtivo.nif:'';
   atualizarSubtitles();
 }
@@ -1060,8 +707,6 @@ function abrirNovoPerfil(nif){
   document.getElementById('perfilModalTitle').textContent=p?'✏️ Editar Perfil':'➕ Novo Perfil';
   document.getElementById('pf_nome').value=p?.nome||'';
   document.getElementById('pf_nif').value=p?.nif||'';
-  const btnEl=document.getElementById('btnEliminarPerfil');
-  if(btnEl) btnEl.style.display=p&&perfis.length>1?'':'none';
   const cp=document.getElementById('colorPick');
   cp.innerHTML=CORES.map(c=>`<div class="cp${(p?.cor||CORES[0])===c?' sel':''}" style="background:${c}" onclick="selCor(this,'${c}')"></div>`).join('');
   document.getElementById('modalPerfil').classList.add('show');
@@ -1073,31 +718,23 @@ function selCor(el,c){
   el.dataset.cor=c;
 }
 
-// guardarPerfil moved to AUTH section
-
-async function eliminarPerfil(){
-  if(!editingPerfilNif) return;
-  const p = perfis.find(x=>x.nif===editingPerfilNif);
-  if(!p) return;
-  const nFaturas = faturas.filter(f=>f.perfil_nif===editingPerfilNif).length;
-  const msg = nFaturas>0
-    ? `Tens ${nFaturas} fatura(s) neste perfil. Eliminar o perfil "${p.nome}" apaga também todas as faturas. Tens a certeza?`
-    : `Eliminar o perfil "${p.nome}"? Esta ação é irreversível.`;
-  if(!confirm(msg)) return;
-  showLoader('A eliminar perfil…');
-  try {
-    // Delete faturas first
-    if(nFaturas>0) await sb.from('faturas').delete().eq('perfil_nif',editingPerfilNif);
-    faturas = faturas.filter(f=>f.perfil_nif!==editingPerfilNif);
-    // Delete profile
-    await sb.from('perfis').delete().eq('nif',editingPerfilNif);
+async function guardarPerfil(){
+  const nome=document.getElementById('pf_nome').value.trim();
+  const nif=document.getElementById('pf_nif').value.trim();
+  const cor=document.querySelector('.cp.sel')?.style?.background||CORES[0];
+  if(!nome||!nif)return toast('⚠️ Preenche nome e NIF','error');
+  showLoader('A guardar perfil…');
+  try{
+    if(editingPerfilNif){
+      await sb.from('perfis').update({nome,nif,cor}).eq('nif',editingPerfilNif);
+    } else {
+      await sb.from('perfis').insert([{nome,nif,cor}]);
+    }
     fecharModal('modalPerfil');
     await carregarPerfis();
-    renderFaturas();
-    calcular();
-    toast('🗑 Perfil eliminado','info');
-  } catch(e){ toast('❌ '+e.message,'error'); }
-  finally { hideLoader(); }
+    toast('✅ Perfil guardado!','success');
+  }catch(e){toast('❌ '+e.message,'error')}
+  finally{hideLoader()}
 }
 
 // ══════════════════════════════════════════════════
@@ -1146,51 +783,6 @@ dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover
 dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])});
 fi.addEventListener('change',()=>{if(fi.files[0])handleFile(fi.files[0])});
-
-// Camera input — single (iOS fix: read file immediately on change)
-const ci=document.getElementById('cameraInput');
-ci.addEventListener('change', function(){
-  const file = this.files && this.files[0];
-  if(!file) return;
-  // Force a copy of the file to avoid iOS blob expiry issues
-  const reader = new FileReader();
-  reader.onload = function(e){
-    const arr = new Uint8Array(e.target.result);
-    const blob = new Blob([arr], {type: file.type||'image/jpeg'});
-    const fresh = new File([blob], file.name||'camera.jpg', {type: blob.type});
-    handleFile(fresh);
-  };
-  reader.readAsArrayBuffer(file);
-});
-
-// Camera input — batch (adds photo to queue)
-const bci=document.getElementById('batchCameraInput');
-bci.addEventListener('change', function(){
-  const file = this.files && this.files[0];
-  if(!file) return;
-  // iOS fix: copy file via FileReader before adding to batch
-  const reader = new FileReader();
-  reader.onload = function(e){
-    const arr = new Uint8Array(e.target.result);
-    const blob = new Blob([arr], {type: file.type||'image/jpeg'});
-    const fresh = new File([blob], file.name||'camera.jpg', {type: blob.type});
-    const dt = new DataTransfer();
-    dt.items.add(fresh);
-    loadBatchFiles(dt.files);
-  };
-  reader.readAsArrayBuffer(file);
-  bci.value='';
-});
-
-// Show camera buttons on touch devices
-if('ontouchstart' in window || navigator.maxTouchPoints>0){
-  const btnCam=document.getElementById('btnCamera');
-  const btnBCam=document.getElementById('btnBatchCamera');
-  if(btnCam) btnCam.style.display='';
-  if(btnBCam) btnBCam.style.display='';
-  // On mobile, also make the drop zone tap to gallery (not camera)
-  // Camera button handles direct capture
-}
 function handleFile(f){
   document.getElementById('dropLabel').textContent=f.name;
   document.getElementById('dropIcon').textContent='✅';
@@ -1201,7 +793,7 @@ function handleFile(f){
 async function extractData(){
   const apiKey=document.getElementById('apiKey').value.trim();
   const file=fi.files[0];
-  if(!apiKey){ toast('⚠️ Introduz a chave API no ⚙️ Configurações','error'); abrirSettings(); return; }
+  if(!apiKey)return toast('⚠️ Introduz a chave API','error');
   if(!file)return toast('⚠️ Seleciona uma fatura','error');
   if(!perfilAtivo)return toast('⚠️ Seleciona um perfil','error');
   showLoader('A analisar fatura com IA…');
@@ -1212,7 +804,48 @@ async function extractData(){
       ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
       :{type:"image",source:{type:"base64",media_type:file.type||'image/jpeg',data:b64}};
 
-    const prompt=buildPrompt();
+    const prompt=`Analisa esta fatura da Região Autónoma da Madeira (Portugal).
+Responde APENAS com JSON válido, sem markdown, sem texto extra.
+
+TAXAS MADEIRA 2025:
+- Taxa REDUZIDA = 4% (campo AT 01/02) — usada em produtos alimentares, medicamentos, etc.
+- Taxa INTERMÉDIA = 12% (campo AT 05/06) — usada em restauração, alguns serviços
+- Taxa NORMAL = 22% (campo AT 03/04) — usada na maioria dos serviços
+
+FATURAS ESTRANGEIRAS (campo 16 da AT):
+Booking.com, Airbnb, Google (Ads, Workspace), Meta/Facebook/Instagram Ads, Microsoft, Adobe, Spotify, Netflix, Amazon, Dropbox, e outras entidades com sede fora de Portugal são ESTRANGEIRAS.
+Se for estrangeira: base_estrangeira = valor sem IVA, iva_estrangeira = 22% da base.
+
+PRESTAÇÕES DE EQUIPAMENTO:
+Linhas de "amortização de equipamento", "prestação de telemóvel/router/tablet" são capital — NÃO são serviço faturado.
+Identifica-as em linhas_suspeitas.
+
+IMPORTANTE: Se a fatura tiver linhas de serviços E prestações, separa-as corretamente.
+O campo "base_22" deve conter APENAS o valor dos SERVIÇOS, não das prestações.
+
+NOTAS DE CRÉDITO: Se for uma nota de crédito/débito, os valores base e IVA devem ser POSITIVOS (a app subtrai automaticamente).
+
+{
+  "fornecedor": "nome",
+  "nif_fornecedor": "NIF ou null",
+  "numero_fatura": "número",
+  "data": "DD/MM/AAAA",
+  "isenta": false,
+  "estrangeira": false,
+  "pais_origem": null,
+  "base_5": 0,
+  "iva_5": 0,
+  "base_12": 0,
+  "iva_12": 0,
+  "base_22": 0,
+  "iva_22": 0,
+  "base_isenta": 0,
+  "base_estrangeira": 0,
+  "iva_estrangeira": 0,
+  "total": 0,
+  "tem_prestacoes": false,
+  "linhas_suspeitas": []
+}`;
 
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1368,42 +1001,8 @@ function recalcTotais(f){
   f.base_total=(+f.base_5||0)+(+f.base_12||0)+(+f.base_22||0)+(+f.base_isenta||0);
   f.iva_total=(+f.iva_5||0)+(+f.iva_12||0)+(+f.iva_22||0);
 }
-
-let _afterDupCallback = null;
-
-function checkDuplicado(f){
-  // Only check if we have meaningful numero and nif
-  if(!f.numero||f.numero==='—'||!f.nif||f.nif==='—') return null;
-  return faturas.find(x =>
-    x.perfil_nif === f.perfil_nif &&
-    x.nif === f.nif &&
-    x.numero === f.numero
-  ) || null;
-}
-
-function mostrarAvisoDup(dup, callback){
-  document.getElementById('dup_fornecedor').textContent = dup.fornecedor||'—';
-  document.getElementById('dup_numero').textContent = dup.numero||'—';
-  document.getElementById('dup_data').textContent = dup.data||'—';
-  document.getElementById('dup_total').textContent = fmt(dup.total);
-  _afterDupCallback = callback;
-  document.getElementById('modalDup').classList.add('show');
-}
-
-async function continuarAposVerificacao(){
-  if(_afterDupCallback) await _afterDupCallback();
-  _afterDupCallback = null;
-}
-
-async function guardarF(f, skipDupCheck=false){
+async function guardarF(f){
   recalcTotais(f);
-  if(!skipDupCheck){
-    const dup = checkDuplicado(f);
-    if(dup){
-      mostrarAvisoDup(dup, ()=>guardarF(f, true));
-      return;
-    }
-  }
   const saved=await sbInsert(f);
   faturas.unshift(saved);
   renderFaturas();calcular();
@@ -1465,18 +1064,18 @@ function renderFaturas(){
   w.innerHTML=`<div style="overflow-x:auto"><table class="ftable"><thead><tr>
     <th>Tipo</th><th>Fornecedor</th><th>Nº / Data</th><th>Base</th><th>IVA</th><th>Campo 16</th><th>Prest.</th><th>Total</th><th></th>
   </tr></thead><tbody>${list.map(f=>`<tr>
-    <td data-label="Tipo">
-      <span class="badge ${f.tipo==='venda'?'bv':f.tipo==='nota_credito'?'bn':'bc'}">${f.tipo==='venda'?'📤 Venda':f.tipo==='nota_credito'?'↩️ N. Crédito':'📥 Compra'}</span>
-      ${f.estrangeira?'&nbsp;<span class="badge be" style="font-size:.62rem">🌍</span>':''}
-    </td>
-    <td data-label="Fornecedor"><strong style="font-size:.82rem">${f.fornecedor}</strong><span style="display:block;font-size:.68rem;color:var(--muted)">${f.ficheiro||''}</span></td>
-    <td data-label="Nº / Data" class="mono">${f.numero}<span style="display:block;color:var(--muted);font-size:.72rem">${f.data}</span></td>
-    <td data-label="Base" class="mono">${fmt(f.base_total)}</td>
-    <td data-label="IVA" class="mono">${f.isenta?'<span style="color:var(--muted);font-size:.73rem">Isento</span>':fmt(f.iva_total)}</td>
-    <td data-label="Campo 16" class="mono">${(f.base_estrangeira||0)>0?'<span style="color:var(--blue);font-weight:700">'+fmt(f.base_estrangeira)+'</span>':'<span style="color:var(--muted)">—</span>'}</td>
-    <td data-label="Prest." class="mono">${(f.prestacoes||0)>0?'<span style="color:var(--gold);font-weight:700">'+fmt(f.prestacoes)+'</span>':'<span style="color:var(--muted)">—</span>'}</td>
-    <td data-label="Total" class="mono"><strong>${fmt(f.total)}</strong></td>
     <td>
+      <span class="badge ${f.tipo==='venda'?'bv':f.tipo==='nota_credito'?'bn':'bc'}">${f.tipo==='venda'?'📤 Venda':f.tipo==='nota_credito'?'↩️ N. Crédito':'📥 Compra'}</span>
+      ${f.estrangeira?'<br><span class="badge be" style="margin-top:.15rem;font-size:.62rem">🌍 Campo 16</span>':''}
+    </td>
+    <td><strong style="font-size:.82rem">${f.fornecedor}</strong><br><span style="font-size:.68rem;color:var(--muted)">${f.ficheiro||''}</span></td>
+    <td class="mono">${f.numero}<br><span style="color:var(--muted);font-size:.72rem">${f.data}</span></td>
+    <td class="mono">${fmt(f.base_total)}</td>
+    <td class="mono">${f.isenta?'<span style="color:var(--muted);font-size:.73rem">Isento</span>':fmt(f.iva_total)}</td>
+    <td class="mono">${(f.base_estrangeira||0)>0?'<span style="color:var(--blue);font-weight:700">'+fmt(f.base_estrangeira)+'</span>':'<span style="color:var(--muted)">—</span>'}</td>
+    <td class="mono">${(f.prestacoes||0)>0?'<span style="color:var(--gold);font-weight:700">'+fmt(f.prestacoes)+'</span>':'<span style="color:var(--muted)">—</span>'}</td>
+    <td class="mono"><strong>${fmt(f.total)}</strong></td>
+    <td style="white-space:nowrap">
       <button class="btn btn-sm" style="background:var(--gold-light);color:var(--gold);border:none;margin-right:.2rem" onclick="abrirEdicao(${f.id})">✏️</button>
       <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none" onclick="delFatura(${f.id})">✕</button>
     </td>
@@ -1680,393 +1279,33 @@ function exportCSV(){
   a.download='faturas_'+perfilAtivo?.nif+'.csv';a.click();
   toast('⬇ CSV exportado!','success');
 }
-
-
-
-
-function abrirSettings(){
-  // Populate field from localStorage
-  const saved = localStorage.getItem('fai_key') || '';
-  const inp = document.getElementById('apiKey');
-  if(inp && saved) inp.value = saved;
-  document.getElementById('modalSettings').classList.add('show');
-  setTimeout(()=>{ if(inp && !inp.value) inp.focus(); }, 200);
-}
-function guardarApiKey(){
-  const k=document.getElementById('apiKey').value.trim();
-  if(k) localStorage.setItem('fai_key',k);
-  fecharModal('modalSettings');
-  toast('✅ Chave API guardada!','success');
-}
-
 // ══════════════════════════════════════════════════
-// AUTH / LOGIN
+// BACKUP COMPLETO
 // ══════════════════════════════════════════════════
-let sessionPerfil = null;
-let loginSelectedNif = null;
-
-// Simple hash (SHA-256 via Web Crypto)
-async function hashPassword(pw){
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-
-async function initAuth(){
-  // Check existing session
-  const saved = localStorage.getItem('fai_session');
-  if(saved){
-    try {
-      const s = JSON.parse(saved);
-      // Validate session against current perfis
-      const p = perfis.find(x=>x.nif===s.nif);
-      if(p){
-        sessionPerfil = p;
-        mostrarApp(p);
-        return;
-      }
-    } catch{}
-  }
-  // Show login
-  renderLoginProfiles();
-}
-
-function renderLoginProfiles(){
-  const wrap = document.getElementById('loginProfiles');
-  if(!perfis.length){
-    wrap.innerHTML='<div style="text-align:center;padding:1rem;color:var(--muted);font-size:.82rem">Sem perfis configurados.</div>';
-    return;
-  }
-  wrap.innerHTML = perfis.map(p=>`
-    <button class="lp-btn" id="lp_${p.nif}" onclick="selectLoginPerfil('${p.nif}')">
-      <div class="lp-dot" style="background:${p.cor}"></div>
-      <div>
-        <div class="lp-name">${p.nome}</div>
-        <div class="lp-nif">NIF ${p.nif}</div>
-      </div>
-      ${p.password_hash?'<span style="margin-left:auto;font-size:.72rem;color:var(--muted)">🔒</span>':'<span style="margin-left:auto;font-size:.72rem;color:var(--success)">🔓 sem password</span>'}
-    </button>`).join('');
-  loginSelectedNif = null;
-  document.getElementById('loginBtn').disabled = true;
-  document.getElementById('loginPwWrap').style.display = 'none';
-}
-
-function selectLoginPerfil(nif){
-  loginSelectedNif = nif;
-  document.querySelectorAll('.lp-btn').forEach(b=>b.classList.remove('selected'));
-  document.getElementById('lp_'+nif)?.classList.add('selected');
-  const p = perfis.find(x=>x.nif===nif);
-  const pwWrap = document.getElementById('loginPwWrap');
-  const btn = document.getElementById('loginBtn');
-  if(p?.password_hash){
-    pwWrap.style.display = '';
-    document.getElementById('loginPwInput').value = '';
-    document.getElementById('loginPwInput').focus();
-    btn.disabled = false;
-    btn.textContent = 'Entrar →';
-  } else {
-    // No password — login directly
-    pwWrap.style.display = 'none';
-    btn.disabled = false;
-    btn.textContent = 'Entrar →';
-  }
-  document.getElementById('loginErr').textContent = '';
-}
-
-async function doLogin(){
-  if(!loginSelectedNif) return;
-  const p = perfis.find(x=>x.nif===loginSelectedNif);
-  if(!p) return;
-  const btn = document.getElementById('loginBtn');
-  btn.disabled = true; btn.textContent = 'A verificar…';
-
-  if(p.password_hash){
-    const pw = document.getElementById('loginPwInput').value;
-    if(!pw){ document.getElementById('loginErr').textContent='Introduz a password'; btn.disabled=false; btn.textContent='Entrar →'; return; }
-    const hash = await hashPassword(pw);
-    if(hash !== p.password_hash){
-      document.getElementById('loginErr').textContent = '❌ Password incorreta';
-      document.getElementById('loginPwInput').value = '';
-      document.getElementById('loginPwInput').focus();
-      btn.disabled=false; btn.textContent='Entrar →';
-      return;
-    }
-  }
-
-  // Success
-  localStorage.setItem('fai_session', JSON.stringify({nif:p.nif, ts:Date.now()}));
-  sessionPerfil = p;
-  mostrarApp(p);
-}
-
-function mostrarApp(p){
-  document.getElementById('loginScreen').style.display = 'none';
-  // Set active profile
-  mudarPerfil(p.nif);
-  // Update session badge
-  document.getElementById('sessionBadge').style.display = '';
-  document.getElementById('sessionDot').style.background = p.cor;
-  document.getElementById('sessionName').textContent = p.nome;
-}
-
-function doLogout(){
-  if(!confirm('Terminar sessão?')) return;
-  localStorage.removeItem('fai_session');
-  sessionPerfil = null;
-  loginSelectedNif = null;
-  document.getElementById('loginScreen').style.display = '';
-  document.getElementById('sessionBadge').style.display = 'none';
-  renderLoginProfiles();
-}
-
-// ══════════════════════════════════════════════════
-// PASSWORD MANAGEMENT (in perfil modal)
-// ══════════════════════════════════════════════════
-async function guardarPerfil(){
-  const nome=document.getElementById('pf_nome').value.trim();
-  const nif=document.getElementById('pf_nif').value.trim();
-  const pw=document.getElementById('pf_pw')?.value?.trim()||'';
-  const cor=document.querySelector('.cp.sel')?.style?.background||CORES[0];
-  if(!nome||!nif)return toast('⚠️ Preenche nome e NIF','error');
-  showLoader('A guardar perfil…');
+async function exportBackup(){
+  showLoader('A preparar backup…');
   try{
-    let password_hash = null;
-    if(pw) password_hash = await hashPassword(pw);
-    else if(editingPerfilNif){
-      // Keep existing hash if no new password entered
-      const existing = perfis.find(x=>x.nif===editingPerfilNif);
-      password_hash = existing?.password_hash || null;
-    }
-
-    if(editingPerfilNif){
-      await sb.from('perfis').update({nome,nif,cor,password_hash}).eq('nif',editingPerfilNif);
-    } else {
-      await sb.from('perfis').insert([{nome,nif,cor,password_hash}]);
-    }
-    fecharModal('modalPerfil');
-    await carregarPerfis();
-    renderLoginProfiles();
-    toast('✅ Perfil guardado!','success');
-  }catch(e){toast('❌ '+e.message,'error')}
-  finally{hideLoader()}
+    const{data,error}=await sb.from('faturas').select('*').order('created_at',{ascending:true});
+    if(error)throw error;
+    const list=data||[];
+    if(!list.length){hideLoader();return toast('⚠️ Sem faturas para fazer backup','error');}
+    const h=['id','perfil_nif','tipo','nc_tipo','estrangeira','fornecedor','nif','numero','data',
+             'base_5','iva_5','base_12','iva_12','base_22','iva_22','base_isenta',
+             'base_estrangeira','iva_estrangeira','base_total','iva_total','total',
+             'prestacoes','isenta','pais_origem','ficheiro','created_at'];
+    const rows=list.map(f=>h.map(k=>`"${String(f[k]??'').replace(/"/g,'""')}"`));
+    const csv='\uFEFF'+h.join(';')+'\n'+rows.map(r=>r.join(';')).join('\n');
+    const now=new Date().toISOString().slice(0,10);
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    a.download='faturai_backup_'+now+'.csv';
+    a.click();
+    toast('💾 Backup completo — '+list.length+' faturas exportadas!','success');
+  }catch(e){toast('❌ '+e.message,'error');}
+  finally{hideLoader();}
 }
 
-// ══════════════════════════════════════════════════
-// UPLOAD TABS
-// ══════════════════════════════════════════════════
-function showUploadTab(tab, el){
-  document.querySelectorAll('.upload-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.upload-pane').forEach(p=>p.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('pane-'+tab).classList.add('active');
-}
 
-// ══════════════════════════════════════════════════
-// BATCH PROCESSING
-// ══════════════════════════════════════════════════
-let batchTipo = 'venda';
-let batchFiles = [];
-let batchRunning = false;
-
-function setBatchType(t){
-  batchTipo=t;
-  document.getElementById('batchBtnV').className='type-btn '+(t==='venda'?'av':'');
-  document.getElementById('batchBtnC').className='type-btn '+(t==='compra'?'ac':'');
-  document.getElementById('batchBtnN').className='type-btn '+(t==='nota_credito'?'an':'');
-}
-
-const bfi = document.getElementById('batchFileInput');
-const bdz = document.getElementById('batchDropZone');
-bdz.addEventListener('dragover',e=>{e.preventDefault();bdz.classList.add('dragover')});
-bdz.addEventListener('dragleave',()=>bdz.classList.remove('dragover'));
-bdz.addEventListener('drop',e=>{e.preventDefault();bdz.classList.remove('dragover');if(e.dataTransfer.files.length)loadBatchFiles(e.dataTransfer.files)});
-bfi.addEventListener('change',()=>{if(bfi.files.length)loadBatchFiles(bfi.files)});
-
-function loadBatchFiles(files){
-  batchFiles = Array.from(files);
-  const wrap = document.getElementById('batchQueueWrap');
-  const queue = document.getElementById('batchQueue');
-  wrap.style.display = '';
-  document.getElementById('batchProgress').textContent = '0 / '+batchFiles.length;
-  document.getElementById('batchBar').style.width = '0%';
-  document.getElementById('btnStartBatch').style.display = '';
-  queue.innerHTML = batchFiles.map((f,i)=>`
-    <div class="qrow waiting" id="qrow_${i}">
-      <div class="q-icon" id="qico_${i}">⏳</div>
-      <div class="q-name">${f.name}</div>
-      <div class="q-status" id="qst_${i}">À espera</div>
-    </div>`).join('');
-}
-
-async function startBatch(){
-  const apiKey = document.getElementById('apiKey').value.trim() || localStorage.getItem('fai_key') || '';
-  if(!apiKey){ toast('⚠️ Introduz a chave API no ⚙️ Configurações','error'); abrirSettings(); return; }
-  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
-  if(batchRunning) return;
-  batchRunning = true;
-  document.getElementById('btnStartBatch').style.display = 'none';
-
-  let done=0, errors=0;
-  for(let i=0; i<batchFiles.length; i++){
-    const f = batchFiles[i];
-    const row = document.getElementById('qrow_'+i);
-    const ico = document.getElementById('qico_'+i);
-    const st = document.getElementById('qst_'+i);
-
-    // Mark as processing
-    row.className='qrow processing';
-    ico.innerHTML='<div class="q-spinner"></div>';
-    st.textContent='A processar…';
-    row.scrollIntoView({behavior:'smooth',block:'nearest'});
-
-    try {
-      // Temporarily set global tipo for this batch
-      tipoAtual = batchTipo;
-      const b64 = await toB64(f);
-      const isPDF = f.type==='application/pdf';
-      const cb = isPDF
-        ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
-        :{type:"image",source:{type:"base64",media_type:f.type||'image/jpeg',data:b64}};
-
-      const prompt = buildPrompt();
-      const resp = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1000,messages:[{role:'user',content:[cb,{type:'text',text:prompt}]}]})
-      });
-      if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Erro API')}
-      const data = await resp.json();
-      let raw = data.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
-      const p = JSON.parse(raw);
-
-      const fatura = {
-        tipo:batchTipo, perfil_nif:perfilAtivo.nif,
-        nc_tipo:batchTipo==='nota_credito'?'venda':null,
-        fornecedor:p.fornecedor||'—', nif:p.nif_fornecedor||'—',
-        numero:p.numero_fatura||'—', data:p.data||'—', isenta:!!p.isenta,
-        estrangeira:!!p.estrangeira, pais_origem:p.pais_origem||null,
-        base_5:+p.base_5||0, iva_5:+p.iva_5||0,
-        base_12:+p.base_12||0, iva_12:+p.iva_12||0,
-        base_22:+p.base_22||0, iva_22:+p.iva_22||0,
-        base_isenta:+p.base_isenta||0,
-        base_estrangeira:+p.base_estrangeira||0, iva_estrangeira:+p.iva_estrangeira||0,
-        total:+p.total||0, prestacoes:0, ficheiro:f.name
-      };
-      recalcTotais(fatura);
-      await guardarF(fatura);
-      done++;
-      row.className='qrow done';
-      ico.textContent='✅';
-      st.textContent=fatura.fornecedor !== '—' ? fatura.fornecedor : 'Guardada';
-    } catch(e) {
-      errors++;
-      row.className='qrow error';
-      ico.textContent='❌';
-      st.textContent=e.message.substring(0,40);
-    }
-
-    // Update progress
-    const pct = Math.round(((i+1)/batchFiles.length)*100);
-    document.getElementById('batchProgress').textContent=(i+1)+' / '+batchFiles.length;
-    document.getElementById('batchBar').style.width=pct+'%';
-
-    // Small delay to avoid rate limiting
-    if(i < batchFiles.length-1) await new Promise(r=>setTimeout(r,800));
-  }
-
-  batchRunning = false;
-  toast(`✅ Lote concluído — ${done} guardadas${errors?' · '+errors+' erros':''}`, errors?'error':'success');
-  calcular();
-  // Reset after 3s
-  setTimeout(()=>{
-    batchFiles=[];
-    document.getElementById('batchQueueWrap').style.display='none';
-    bfi.value='';
-  }, 4000);
-}
-
-// ══════════════════════════════════════════════════
-// FATURA MANUAL
-// ══════════════════════════════════════════════════
-let manualTipo = 'venda';
-
-function setManualType(t){
-  manualTipo=t;
-  document.getElementById('manBtnV').className='type-btn '+(t==='venda'?'av':'');
-  document.getElementById('manBtnC').className='type-btn '+(t==='compra'?'ac':'');
-  document.getElementById('manBtnN').className='type-btn '+(t==='nota_credito'?'an':'');
-}
-
-function calcManualIva(){
-  const b5=parseFloat(document.getElementById('man_base_5').value)||0;
-  const b12=parseFloat(document.getElementById('man_base_12').value)||0;
-  const b22=parseFloat(document.getElementById('man_base_22').value)||0;
-  const bi=parseFloat(document.getElementById('man_base_isenta').value)||0;
-  // Always recalculate IVA from base
-  const i5=document.getElementById('man_iva_5');
-  const i12=document.getElementById('man_iva_12');
-  const i22=document.getElementById('man_iva_22');
-  const tot=document.getElementById('man_total');
-  i5.value = b5 ? (b5*0.04).toFixed(2) : '';
-  i12.value = b12 ? (b12*0.12).toFixed(2) : '';
-  i22.value = b22 ? (b22*0.22).toFixed(2) : '';
-  // Recalculate total
-  const iva=(parseFloat(i5.value)||0)+(parseFloat(i12.value)||0)+(parseFloat(i22.value)||0);
-  tot.value = (b5+b12+b22+bi+iva).toFixed(2);
-}
-
-async function guardarManual(){
-  const fornecedor=document.getElementById('man_fornecedor').value.trim();
-  const numero=document.getElementById('man_numero').value.trim();
-  const data=document.getElementById('man_data').value.trim();
-  if(!fornecedor||!numero||!data) return toast('⚠️ Preenche os campos obrigatórios (*)','error');
-  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
-
-  const b5=parseFloat(document.getElementById('man_base_5').value)||0;
-  const b12=parseFloat(document.getElementById('man_base_12').value)||0;
-  const b22=parseFloat(document.getElementById('man_base_22').value)||0;
-
-  const fatura = {
-    tipo: manualTipo,
-    perfil_nif: perfilAtivo.nif,
-    nc_tipo: manualTipo==='nota_credito'?'venda':null,
-    fornecedor, nif: document.getElementById('man_nif').value.trim()||'—',
-    numero, data, isenta: (b5+b12+b22)===0,
-    estrangeira: false, pais_origem: null,
-    base_5:b5, iva_5:parseFloat(document.getElementById('man_iva_5').value)||+(b5*0.04).toFixed(2),
-    base_12:b12, iva_12:parseFloat(document.getElementById('man_iva_12').value)||+(b12*0.12).toFixed(2),
-    base_22:b22, iva_22:parseFloat(document.getElementById('man_iva_22').value)||+(b22*0.22).toFixed(2),
-    base_isenta:parseFloat(document.getElementById('man_base_isenta').value)||0,
-    base_estrangeira:0, iva_estrangeira:0,
-    total:parseFloat(document.getElementById('man_total').value)||0,
-    prestacoes:0, ficheiro:'manual'
-  };
-  recalcTotais(fatura);
-
-  showLoader('A guardar fatura manual…');
-  try {
-    await guardarF(fatura);
-    // Reset form
-    ['man_fornecedor','man_nif','man_numero','man_data','man_base_5','man_iva_5',
-     'man_base_12','man_iva_12','man_base_22','man_iva_22','man_base_isenta','man_total'
-    ].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    toast('✅ Fatura manual guardada!','success');
-  } catch(e){ toast('❌ '+e.message,'error'); }
-  finally { hideLoader(); }
-}
-
-// Helper: shared IA prompt
-function buildPrompt(){
-  return `Analisa esta fatura da Região Autónoma da Madeira (Portugal).
-Responde APENAS com JSON válido, sem markdown, sem texto extra.
-
-TAXAS MADEIRA 2025: Reduzida=4% (campo AT 01/02), Intermédia=12% (campo AT 05/06), Normal=22% (campo AT 03/04).
-
-FATURAS ESTRANGEIRAS (campo 16): Booking.com, Airbnb, Google, Meta, Microsoft, Adobe e similares.
-PRESTAÇÕES: Amortizações de equipamento — identificar em linhas_suspeitas.
-NOTA DE CRÉDITO: Se for NC, valores positivos (a app subtrai automaticamente).
-
-{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"linhas_suspeitas":[]}`;
-}
 
 // ══════════════════════════════════════════════════
 // NOTAS DE CRÉDITO
@@ -2123,7 +1362,7 @@ const VAPID_PUBLIC_KEY = 'BB80G6mEw94Nt7s163UPi--RUn3jgZhK_MTRDh3jy-OMH-zacitxtp
 if('serviceWorker' in navigator){
   window.addEventListener('load', async () => {
     try {
-      const reg = await navigator.serviceWorker.register('/faturai/sw.js');
+      const reg = await navigator.serviceWorker.register('/sw.js');
       console.log('SW registered:', reg.scope);
       checkNotifStatus(reg);
     } catch(e) {
@@ -2180,6 +1419,9 @@ async function ativarNotificacoes(){
       return;
     }
     const reg = await navigator.serviceWorker.ready;
+    // Unsubscribe existing first (needed after domain change)
+    const existingSub = await reg.pushManager.getSubscription();
+    if(existingSub) await existingSub.unsubscribe();
     // Convert VAPID public key
     const appServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
     const sub = await reg.pushManager.subscribe({
@@ -2210,32 +1452,14 @@ async function testarNotificacao(){
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
-    if(!sub){ toast('⚠️ Sem subscrição ativa — ativa primeiro as notificações','error'); return; }
-
-    toast('⏳ A enviar teste…','info');
-
-    // Use XMLHttpRequest instead of fetch — more reliable in iOS PWA
-    await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST','https://rfkxxzovukosbosyqhuj.supabase.co/functions/v1/send-push-notifications?test=1',true);
-      xhr.setRequestHeader('Content-Type','application/json');
-      xhr.timeout = 15000;
-      xhr.onload = () => {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          console.log('Push test result:', data);
-          if(data.sent > 0){
-            toast('✅ Notificação enviada! Verifica o iPhone.','success');
-          } else {
-            toast('⚠️ Enviado mas push falhou (sent=0). Erro: '+(data.results?.[0]?.error||'desconhecido').substring(0,60),'error');
-          }
-        } catch(e){ toast('✅ Pedido enviado (resposta: '+xhr.status+')','info'); }
-        resolve(null);
-      };
-      xhr.onerror = () => reject(new Error('Erro de rede (XHR)'));
-      xhr.ontimeout = () => reject(new Error('Timeout — sem resposta'));
-      xhr.send('{}');
+    if(!sub){ toast('⚠️ Sem subscrição ativa','error'); return; }
+    // Call edge function with test=1
+    const res = await fetch('https://rfkxxzovukosbosyqhuj.supabase.co/functions/v1/send-push-notifications?test=1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
     });
+    const data = await res.json();
+    toast(data.sent > 0 ? '✅ Notificação de teste enviada!' : '⚠️ Sem subscrições registadas', data.sent > 0 ? 'success' : 'error');
   } catch(e) {
     toast('❌ ' + e.message, 'error');
   }
