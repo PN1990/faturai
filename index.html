@@ -106,7 +106,9 @@ window.addEventListener('DOMContentLoaded', () => {
     bci.value='';
   });
 
-  if('ontouchstart' in window || navigator.maxTouchPoints>0){
+  // Mostrar câmara sempre em mobile (iOS/Android)
+  const _isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 'ontouchstart' in window || navigator.maxTouchPoints>0;
+  if(_isMobile){
     const btnCam=document.getElementById('btnCamera');
     const btnBCam=document.getElementById('btnBatchCamera');
     if(btnCam) btnCam.style.display='';
@@ -236,6 +238,7 @@ async function guardarManual(){
     base_isenta:parseFloat(document.getElementById('man_base_isenta').value)||0,
     base_estrangeira:0, iva_estrangeira:0,
     total:parseFloat(document.getElementById('man_total').value)||0,
+    nota:document.getElementById('man_nota')?.value.trim()||null,
     prestacoes:0, ficheiro:'manual'
   };
   recalcTotais(fatura);
@@ -686,6 +689,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <div class="edit-field"><label class="edit-label">IVA 22% (€)</label><input class="edit-input" id="ef_iva_22" type="number" step="0.01" /></div>
         <div class="edit-field"><label class="edit-label">Base isenta (€)</label><input class="edit-input" id="ef_base_isenta" type="number" step="0.01" /></div>
         <div class="edit-field"><label class="edit-label">Total fatura (€)</label><input class="edit-input" id="ef_total" type="number" step="0.01" /></div>
+        <div class="edit-field edit-full"><label class="edit-label">📝 Nota</label><input class="edit-input" id="ef_nota" placeholder="Observações opcionais…" /></div>
       </div>
     </div>
     <div class="modal-ft">
@@ -713,6 +717,32 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
     <div class="modal-ft">
       <button class="btn btn-outline btn-sm" onclick="fecharModal('modalPerfil')">Cancelar</button>
       <button class="btn btn-sm" style="background:#7b2d8b;color:#fff" onclick="guardarPerfil()">💾 Guardar Perfil</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: IMPORTAR BACKUP -->
+<div class="overlay" id="modalImport">
+  <div class="modal" style="width:480px">
+    <div class="modal-hd" style="background:var(--blue)"><div class="modal-title">📥 Importar CSV de Backup</div></div>
+    <div class="modal-body">
+      <div class="info-box blue" style="margin-bottom:.85rem">
+        Importa um ficheiro CSV exportado pelo botão <strong>💾 Backup</strong>.<br>
+        As faturas já existentes <strong>não serão duplicadas</strong> (verifica por número + NIF).
+      </div>
+      <div class="drop-zone" id="importDropZone" style="min-height:90px;margin-bottom:.85rem">
+        <input type="file" id="importFileInput" accept=".csv" />
+        <div class="drop-icon" id="importIcon">📂</div>
+        <div class="drop-label" id="importLabel">Clica para selecionar o CSV</div>
+        <div class="drop-sub">Ficheiro .csv exportado pelo FaturaAI</div>
+      </div>
+      <div id="importPreview" style="display:none">
+        <div class="info-box green" id="importInfo"></div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline btn-sm" onclick="fecharModal('modalImport')">Cancelar</button>
+      <button class="btn btn-blue btn-sm" id="btnConfirmImport" onclick="confirmarImport()" disabled>📥 Importar</button>
     </div>
   </div>
 </div>
@@ -893,6 +923,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
             <div class="edit-field"><label class="edit-label">IVA 22% (€)</label><input class="edit-input" id="man_iva_22" type="number" step="0.01" placeholder="auto" /></div>
             <div class="edit-field"><label class="edit-label">Base isenta (€)</label><input class="edit-input" id="man_base_isenta" type="number" step="0.01" placeholder="0.00" /></div>
             <div class="edit-field"><label class="edit-label">Total fatura (€)</label><input class="edit-input" id="man_total" type="number" step="0.01" placeholder="0.00" /></div>
+            <div class="edit-field edit-full"><label class="edit-label">📝 Nota</label><input class="edit-input" id="man_nota" placeholder="Observações opcionais…" /></div>
           </div>
           <div class="info-box green" style="margin-bottom:.85rem;font-size:.74rem">💡 O IVA é calculado automaticamente ao preencher a base.</div>
           <button class="btn btn-primary" onclick="guardarManual()">💾 Guardar Fatura Manual</button>
@@ -906,6 +937,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
           <span id="fatCount" style="font-size:.72rem;color:var(--muted);font-family:'Syne Mono',monospace">—</span>
           <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇ CSV</button>
           <button class="btn btn-outline btn-sm" onclick="exportBackup()" title="Backup completo de todas as faturas">💾 Backup</button>
+          <button class="btn btn-outline btn-sm" onclick="abrirImportBackup()" title="Importar CSV de backup">📥 Importar</button>
           <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" onclick="clearAll()">🗑 Limpar</button>
         </div>
       </div>
@@ -1412,7 +1444,7 @@ async function confirmarPrest(){
 function abrirEdicao(id){
   const f=faturas.find(x=>x.id===id);if(!f)return;
   editingId=id;
-  ['fornecedor','nif','numero','data','base_5','iva_5','base_12','iva_12','base_22','iva_22','base_isenta','total'].forEach(k=>{
+  ['fornecedor','nif','numero','data','base_5','iva_5','base_12','iva_12','base_22','iva_22','base_isenta','total','nota'].forEach(k=>{
     const el=document.getElementById('ef_'+k);if(el)el.value=f[k]??'';
   });
   document.getElementById('modalEdit').classList.add('show');
@@ -1431,6 +1463,7 @@ async function guardarEdicao(){
     iva_22:parseFloat(document.getElementById('ef_iva_22').value)||0,
     base_isenta:parseFloat(document.getElementById('ef_base_isenta').value)||0,
     total:parseFloat(document.getElementById('ef_total').value)||0,
+    nota:document.getElementById('ef_nota').value.trim()||null,
   };
   recalcTotais(upd);
   showLoader('A guardar…');
@@ -1522,7 +1555,7 @@ function renderFaturas(){
       <span class="badge ${f.tipo==='venda'?'bv':f.tipo==='nota_credito'?'bn':'bc'}">${f.tipo==='venda'?'📤 Venda':f.tipo==='nota_credito'?'↩️ N. Crédito':'📥 Compra'}</span>
       ${f.estrangeira?'<br><span class="badge be" style="margin-top:.15rem;font-size:.62rem">🌍 Campo 16</span>':''}
     </td>
-    <td><strong style="font-size:.82rem">${f.fornecedor}</strong><br><span style="font-size:.68rem;color:var(--muted)">${f.ficheiro||''}</span></td>
+    <td><strong style="font-size:.82rem">${f.fornecedor}</strong><br><span style="font-size:.68rem;color:var(--muted)">${f.ficheiro||''}</span>${f.nota?`<br><span style="font-size:.7rem;color:var(--gold)">📝 ${f.nota}</span>`:''}</td>
     <td class="mono">${f.numero}<br><span style="color:var(--muted);font-size:.72rem">${f.data}</span></td>
     <td class="mono">${fmt(f.base_total)}</td>
     <td class="mono">${f.isenta?'<span style="color:var(--muted);font-size:.73rem">Isento</span>':fmt(f.iva_total)}</td>
@@ -1733,6 +1766,107 @@ function exportCSV(){
   a.download='faturas_'+perfilAtivo?.nif+'.csv';a.click();
   toast('⬇ CSV exportado!','success');
 }
+
+// ══════════════════════════════════════════════════
+// IMPORTAR CSV DE BACKUP
+// ══════════════════════════════════════════════════
+let importRows = [];
+
+function abrirImportBackup(){
+  importRows = [];
+  document.getElementById('importIcon').textContent = '📂';
+  document.getElementById('importLabel').textContent = 'Clica para selecionar o CSV';
+  document.getElementById('importPreview').style.display = 'none';
+  document.getElementById('btnConfirmImport').disabled = true;
+  document.getElementById('importFileInput').value = '';
+  document.getElementById('modalImport').classList.add('show');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const imp = document.getElementById('importFileInput');
+  if(imp) imp.addEventListener('change', function(){
+    const file = this.files && this.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try {
+        const text = e.target.result;
+        const lines = text.replace(/^\uFEFF/, '').split('\n').filter(l=>l.trim());
+        if(lines.length < 2){ toast('⚠️ CSV inválido ou vazio','error'); return; }
+        const header = lines[0].split(';').map(h=>h.replace(/"/g,'').trim());
+        // Suportar CSV do backup (tem campo 'fornecedor') e CSV do filtro
+        const rows = [];
+        for(let i=1; i<lines.length; i++){
+          const vals = lines[i].match(/(".*?"|[^;]+)(?=;|$)/g)||[];
+          const obj = {};
+          header.forEach((h,j)=>{ obj[h] = (vals[j]||'').replace(/^"|"$/g,'').trim(); });
+          if(obj.fornecedor) rows.push(obj);
+        }
+        importRows = rows;
+        document.getElementById('importIcon').textContent = '✅';
+        document.getElementById('importLabel').textContent = file.name;
+        document.getElementById('importPreview').style.display = '';
+        document.getElementById('importInfo').innerHTML =
+          `<strong>${rows.length} faturas encontradas no ficheiro.</strong><br>` +
+          `Perfis presentes: ${[...new Set(rows.map(r=>r.perfil_nif||r.Perfil))].filter(Boolean).join(', ')||'—'}`;
+        document.getElementById('btnConfirmImport').disabled = false;
+      } catch(err) {
+        toast('❌ Erro ao ler CSV: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  });
+});
+
+async function confirmarImport(){
+  if(!importRows.length) return;
+  showLoader('A importar faturas…');
+  let importadas = 0, ignoradas = 0, erros = 0;
+  try {
+    for(const r of importRows){
+      // Mapear colunas (suporta backup completo e CSV filtrado)
+      const f = {
+        perfil_nif: r.perfil_nif || r.Perfil || perfilAtivo?.nif,
+        tipo: r.tipo || r.Tipo || 'compra',
+        nc_tipo: r.nc_tipo || null,
+        fornecedor: r.fornecedor || r.Fornecedor || '—',
+        nif: r.nif || r.NIF || '—',
+        numero: r.numero || r.Numero || '—',
+        data: r.data || r.Data || '—',
+        base_5: parseFloat(r.base_5||r.Base4||0)||0,
+        iva_5: parseFloat(r.iva_5||r.IVA4||0)||0,
+        base_12: parseFloat(r.base_12||r.Base12||0)||0,
+        iva_12: parseFloat(r.iva_12||r.IVA12||0)||0,
+        base_22: parseFloat(r.base_22||r.Base22||0)||0,
+        iva_22: parseFloat(r.iva_22||r.IVA22||0)||0,
+        base_isenta: parseFloat(r.base_isenta||r.BaseIsenta||0)||0,
+        base_estrangeira: parseFloat(r.base_estrangeira||r.BaseEstrang||0)||0,
+        iva_estrangeira: parseFloat(r.iva_estrangeira||r.IvaEstrang||0)||0,
+        total: parseFloat(r.total||r.Total||0)||0,
+        prestacoes: parseFloat(r.prestacoes||r.Prestacoes||0)||0,
+        isenta: (r.isenta||r.Estrangeira||'').toLowerCase()==='true'||false,
+        estrangeira: (r.estrangeira||r.Estrangeira||'').toLowerCase()==='sim'||false,
+        nota: r.nota||null,
+        ficheiro: r.ficheiro||'importado',
+      };
+      // Verificar duplicado
+      const dup = faturas.find(x=>
+        x.perfil_nif===f.perfil_nif && x.nif===f.nif && x.numero===f.numero && f.nif!=='—'
+      );
+      if(dup){ ignoradas++; continue; }
+      try {
+        const saved = await sbInsert(f);
+        faturas.unshift(saved);
+        importadas++;
+      } catch(e){ erros++; }
+    }
+    renderFaturas(); calcular();
+    fecharModal('modalImport');
+    toast(`✅ ${importadas} importadas · ${ignoradas} ignoradas (já existiam)${erros?' · '+erros+' erros':''}`, 'success');
+  } catch(e){ toast('❌ '+e.message,'error'); }
+  finally { hideLoader(); }
+}
+
 // ══════════════════════════════════════════════════
 // BACKUP COMPLETO
 // ══════════════════════════════════════════════════
