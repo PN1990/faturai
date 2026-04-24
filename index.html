@@ -11,249 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="FaturaAI">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Syne+Mono&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
-// ══════════════════════════════════════════════════
-// UPLOAD TABS
-// ══════════════════════════════════════════════════
-function showUploadTab(tab, el){
-  document.querySelectorAll('.upload-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.upload-pane').forEach(p=>p.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('pane-'+tab).classList.add('active');
-}
-
-// ══════════════════════════════════════════════════
-// DUPLICADO
-// ══════════════════════════════════════════════════
-let _afterDupCallback = null;
-
-function checkDuplicado(f){
-  if(!f.numero||f.numero==='—'||!f.nif||f.nif==='—') return null;
-  return faturas.find(x =>
-    x.perfil_nif === f.perfil_nif &&
-    x.nif === f.nif &&
-    x.numero === f.numero
-  ) || null;
-}
-
-function mostrarAvisoDup(dup, callback){
-  document.getElementById('dup_fornecedor').textContent = dup.fornecedor||'—';
-  document.getElementById('dup_numero').textContent = dup.numero||'—';
-  document.getElementById('dup_data').textContent = dup.data||'—';
-  document.getElementById('dup_total').textContent = fmt(dup.total);
-  _afterDupCallback = callback;
-  document.getElementById('modalDup').classList.add('show');
-}
-
-async function continuarAposVerificacao(){
-  if(_afterDupCallback) await _afterDupCallback();
-  _afterDupCallback = null;
-}
-
-// ══════════════════════════════════════════════════
-// BATCH PROCESSING
-// ══════════════════════════════════════════════════
-let batchTipo = 'venda';
-let batchFiles = [];
-let batchRunning = false;
-
-function setBatchType(t){
-  batchTipo=t;
-  document.getElementById('batchBtnV').className='type-btn '+(t==='venda'?'av':'');
-  document.getElementById('batchBtnC').className='type-btn '+(t==='compra'?'ac':'');
-  document.getElementById('batchBtnN').className='type-btn '+(t==='nota_credito'?'an':'');
-}
-
-function loadBatchFiles(files){
-  batchFiles = Array.from(files);
-  const wrap = document.getElementById('batchQueueWrap');
-  wrap.style.display = '';
-  document.getElementById('batchProgress').textContent = '0 / '+batchFiles.length;
-  document.getElementById('batchBar').style.width = '0%';
-  document.getElementById('btnStartBatch').style.display = '';
-  document.getElementById('batchQueue').innerHTML = batchFiles.map((f,i)=>`
-    <div class="qrow waiting" id="qrow_${i}">
-      <div class="q-icon" id="qico_${i}">⏳</div>
-      <div class="q-name">${f.name}</div>
-      <div class="q-status" id="qst_${i}">À espera</div>
-    </div>`).join('');
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  const bfi = document.getElementById('batchFileInput');
-  const bdz = document.getElementById('batchDropZone');
-  if(bdz){
-    bdz.addEventListener('dragover',e=>{e.preventDefault();bdz.classList.add('dragover')});
-    bdz.addEventListener('dragleave',()=>bdz.classList.remove('dragover'));
-    bdz.addEventListener('drop',e=>{e.preventDefault();bdz.classList.remove('dragover');if(e.dataTransfer.files.length)loadBatchFiles(e.dataTransfer.files)});
-  }
-  if(bfi) bfi.addEventListener('change',()=>{if(bfi.files.length)loadBatchFiles(bfi.files)});
-
-  const bci = document.getElementById('batchCameraInput');
-  if(bci) bci.addEventListener('change', function(){
-    const file = this.files && this.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e){
-      const arr = new Uint8Array(e.target.result);
-      const blob = new Blob([arr], {type: file.type||'image/jpeg'});
-      const fresh = new File([blob], file.name||'camera.jpg', {type: blob.type});
-      const dt = new DataTransfer();
-      dt.items.add(fresh);
-      loadBatchFiles(dt.files);
-    };
-    reader.readAsArrayBuffer(file);
-    bci.value='';
-  });
-
-  // Mostrar câmara sempre em mobile (iOS/Android)
-  const _isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 'ontouchstart' in window || navigator.maxTouchPoints>0;
-  if(_isMobile){
-    const btnCam=document.getElementById('btnCamera');
-    const btnBCam=document.getElementById('btnBatchCamera');
-    if(btnCam) btnCam.style.display='';
-    if(btnBCam) btnBCam.style.display='';
-  }
-});
-
-async function startBatch(){
-  const apiKey = document.getElementById('apiKey').value.trim() || localStorage.getItem('fai_key') || '';
-  if(!apiKey){ toast('⚠️ Introduz a chave API','error'); abrirSettings(); return; }
-  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
-  if(batchRunning) return;
-  batchRunning = true;
-  document.getElementById('btnStartBatch').style.display = 'none';
-  let done=0, errors=0;
-  for(let i=0; i<batchFiles.length; i++){
-    const f = batchFiles[i];
-    const row = document.getElementById('qrow_'+i);
-    const ico = document.getElementById('qico_'+i);
-    const st = document.getElementById('qst_'+i);
-    row.className='qrow processing';
-    ico.innerHTML='<div class="q-spinner"></div>';
-    st.textContent='A processar…';
-    row.scrollIntoView({behavior:'smooth',block:'nearest'});
-    try {
-      tipoAtual = batchTipo;
-      const b64 = await toB64(f);
-      const isPDF = f.type==='application/pdf';
-      const cb = isPDF
-        ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
-        :{type:"image",source:{type:"base64",media_type:f.type||'image/jpeg',data:b64}};
-      const resp = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1000,messages:[{role:'user',content:[cb,{type:'text',text:buildPrompt()}]}]})
-      });
-      if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Erro API')}
-      const data = await resp.json();
-      let raw = data.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
-      const p = JSON.parse(raw);
-      const fatura = {
-        tipo:batchTipo, perfil_nif:perfilAtivo.nif,
-        nc_tipo:batchTipo==='nota_credito'?'venda':null,
-        fornecedor:p.fornecedor||'—', nif:p.nif_fornecedor||'—',
-        numero:p.numero_fatura||'—', data:p.data||'—', isenta:!!p.isenta,
-        estrangeira:!!p.estrangeira, pais_origem:p.pais_origem||null,
-        base_5:+p.base_5||0, iva_5:+p.iva_5||0,
-        base_12:+p.base_12||0, iva_12:+p.iva_12||0,
-        base_22:+p.base_22||0, iva_22:+p.iva_22||0,
-        base_isenta:+p.base_isenta||0,
-        base_estrangeira:+p.base_estrangeira||0, iva_estrangeira:+p.iva_estrangeira||0,
-        total:+p.total||0, prestacoes:0, ficheiro:f.name
-      };
-      recalcTotais(fatura);
-      await guardarF(fatura);
-      done++;
-      row.className='qrow done';
-      ico.textContent='✅';
-      st.textContent=fatura.fornecedor !== '—' ? fatura.fornecedor : 'Guardada';
-    } catch(e) {
-      errors++;
-      row.className='qrow error';
-      ico.textContent='❌';
-      st.textContent=e.message.substring(0,40);
-    }
-    const pct = Math.round(((i+1)/batchFiles.length)*100);
-    document.getElementById('batchProgress').textContent=(i+1)+' / '+batchFiles.length;
-    document.getElementById('batchBar').style.width=pct+'%';
-    if(i < batchFiles.length-1) await new Promise(r=>setTimeout(r,800));
-  }
-  batchRunning = false;
-  toast('✅ Lote concluído — '+done+' guardadas'+(errors?' · '+errors+' erros':''), errors?'error':'success');
-  calcular();
-  setTimeout(()=>{
-    batchFiles=[];
-    document.getElementById('batchQueueWrap').style.display='none';
-    document.getElementById('batchFileInput').value='';
-  }, 4000);
-}
-
-// ══════════════════════════════════════════════════
-// FATURA MANUAL
-// ══════════════════════════════════════════════════
-let manualTipo = 'venda';
-
-function setManualType(t){
-  manualTipo=t;
-  document.getElementById('manBtnV').className='type-btn '+(t==='venda'?'av':'');
-  document.getElementById('manBtnC').className='type-btn '+(t==='compra'?'ac':'');
-  document.getElementById('manBtnN').className='type-btn '+(t==='nota_credito'?'an':'');
-}
-
-function calcManualIva(){
-  const b5=parseFloat(document.getElementById('man_base_5').value)||0;
-  const b12=parseFloat(document.getElementById('man_base_12').value)||0;
-  const b22=parseFloat(document.getElementById('man_base_22').value)||0;
-  const bi=parseFloat(document.getElementById('man_base_isenta').value)||0;
-  const i5=document.getElementById('man_iva_5');
-  const i12=document.getElementById('man_iva_12');
-  const i22=document.getElementById('man_iva_22');
-  const tot=document.getElementById('man_total');
-  i5.value = b5 ? (b5*0.04).toFixed(2) : '';
-  i12.value = b12 ? (b12*0.12).toFixed(2) : '';
-  i22.value = b22 ? (b22*0.22).toFixed(2) : '';
-  const iva=(parseFloat(i5.value)||0)+(parseFloat(i12.value)||0)+(parseFloat(i22.value)||0);
-  tot.value = (b5+b12+b22+bi+iva).toFixed(2);
-}
-
-async function guardarManual(){
-  const fornecedor=document.getElementById('man_fornecedor').value.trim();
-  const numero=document.getElementById('man_numero').value.trim();
-  const data=document.getElementById('man_data').value.trim();
-  if(!fornecedor||!numero||!data) return toast('⚠️ Preenche os campos obrigatórios (*)','error');
-  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
-  const b5=parseFloat(document.getElementById('man_base_5').value)||0;
-  const b12=parseFloat(document.getElementById('man_base_12').value)||0;
-  const b22=parseFloat(document.getElementById('man_base_22').value)||0;
-  const fatura = {
-    tipo: manualTipo, perfil_nif: perfilAtivo.nif,
-    nc_tipo: manualTipo==='nota_credito'?'venda':null,
-    fornecedor, nif: document.getElementById('man_nif').value.trim()||'—',
-    numero, data, isenta: (b5+b12+b22)===0,
-    estrangeira: false, pais_origem: null,
-    base_5:b5, iva_5:parseFloat(document.getElementById('man_iva_5').value)||+(b5*0.04).toFixed(2),
-    base_12:b12, iva_12:parseFloat(document.getElementById('man_iva_12').value)||+(b12*0.12).toFixed(2),
-    base_22:b22, iva_22:parseFloat(document.getElementById('man_iva_22').value)||+(b22*0.22).toFixed(2),
-    base_isenta:parseFloat(document.getElementById('man_base_isenta').value)||0,
-    base_estrangeira:0, iva_estrangeira:0,
-    total:parseFloat(document.getElementById('man_total').value)||0,
-    nota:document.getElementById('man_nota')?.value.trim()||null,
-    prestacoes:0, ficheiro:'manual'
-  };
-  recalcTotais(fatura);
-  showLoader('A guardar fatura manual…');
-  try {
-    await guardarF(fatura);
-    ['man_fornecedor','man_nif','man_numero','man_data','man_base_5','man_iva_5',
-     'man_base_12','man_iva_12','man_base_22','man_iva_22','man_base_isenta','man_total'
-    ].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    toast('✅ Fatura manual guardada!','success');
-  } catch(e){ toast('❌ '+e.message,'error'); }
-  finally { hideLoader(); }
-}
-
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -494,6 +252,8 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
   .perfil-bar::-webkit-scrollbar{display:none}
   .perfil-label{display:none}
   .pbtn{font-size:.72rem;padding:.28rem .65rem;white-space:nowrap;flex-shrink:0}
+  .pbtn-actions{display:flex !important}
+  .pbtn-action{opacity:1 !important;font-size:.8rem !important}
   .pbtn-add{flex-shrink:0}
   #perfilNif{display:none}
   .container{padding:.75rem;width:100%;box-sizing:border-box}
@@ -727,14 +487,14 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
     <div class="modal-hd" style="background:var(--blue)"><div class="modal-title">📥 Importar CSV de Backup</div></div>
     <div class="modal-body">
       <div class="info-box blue" style="margin-bottom:.85rem">
-        Importa um ficheiro CSV exportado pelo botão <strong>💾 Backup</strong>.<br>
-        As faturas já existentes <strong>não serão duplicadas</strong> (verifica por número + NIF).
+        Importa um CSV exportado pelo <strong>💾 Backup</strong>.<br>
+        Faturas já existentes são ignoradas automaticamente (por NIF + número).
       </div>
-      <div class="drop-zone" id="importDropZone" style="min-height:90px;margin-bottom:.85rem">
-        <input type="file" id="importFileInput" accept=".csv" />
+      <div class="drop-zone" style="min-height:90px;margin-bottom:.85rem;position:relative">
+        <input type="file" id="importFileInput" accept=".csv" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" />
         <div class="drop-icon" id="importIcon">📂</div>
         <div class="drop-label" id="importLabel">Clica para selecionar o CSV</div>
-        <div class="drop-sub">Ficheiro .csv exportado pelo FaturaAI</div>
+        <div class="drop-sub">.csv exportado pelo FaturaAI</div>
       </div>
       <div id="importPreview" style="display:none">
         <div class="info-box green" id="importInfo"></div>
@@ -937,7 +697,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
           <span id="fatCount" style="font-size:.72rem;color:var(--muted);font-family:'Syne Mono',monospace">—</span>
           <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇ CSV</button>
           <button class="btn btn-outline btn-sm" onclick="exportBackup()" title="Backup completo de todas as faturas">💾 Backup</button>
-          <button class="btn btn-outline btn-sm" onclick="abrirImportBackup()" title="Importar CSV de backup">📥 Importar</button>
+          <button class="btn btn-outline btn-sm" onclick="abrirImportBackup()">📥 Importar</button>
           <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" onclick="clearAll()">🗑 Limpar</button>
         </div>
       </div>
@@ -1463,7 +1223,7 @@ async function guardarEdicao(){
     iva_22:parseFloat(document.getElementById('ef_iva_22').value)||0,
     base_isenta:parseFloat(document.getElementById('ef_base_isenta').value)||0,
     total:parseFloat(document.getElementById('ef_total').value)||0,
-    nota:document.getElementById('ef_nota').value.trim()||null,
+    nota:document.getElementById('ef_nota')?.value.trim()||null,
   };
   recalcTotais(upd);
   showLoader('A guardar…');
@@ -1766,107 +1526,6 @@ function exportCSV(){
   a.download='faturas_'+perfilAtivo?.nif+'.csv';a.click();
   toast('⬇ CSV exportado!','success');
 }
-
-// ══════════════════════════════════════════════════
-// IMPORTAR CSV DE BACKUP
-// ══════════════════════════════════════════════════
-let importRows = [];
-
-function abrirImportBackup(){
-  importRows = [];
-  document.getElementById('importIcon').textContent = '📂';
-  document.getElementById('importLabel').textContent = 'Clica para selecionar o CSV';
-  document.getElementById('importPreview').style.display = 'none';
-  document.getElementById('btnConfirmImport').disabled = true;
-  document.getElementById('importFileInput').value = '';
-  document.getElementById('modalImport').classList.add('show');
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const imp = document.getElementById('importFileInput');
-  if(imp) imp.addEventListener('change', function(){
-    const file = this.files && this.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e){
-      try {
-        const text = e.target.result;
-        const lines = text.replace(/^\uFEFF/, '').split('\n').filter(l=>l.trim());
-        if(lines.length < 2){ toast('⚠️ CSV inválido ou vazio','error'); return; }
-        const header = lines[0].split(';').map(h=>h.replace(/"/g,'').trim());
-        // Suportar CSV do backup (tem campo 'fornecedor') e CSV do filtro
-        const rows = [];
-        for(let i=1; i<lines.length; i++){
-          const vals = lines[i].match(/(".*?"|[^;]+)(?=;|$)/g)||[];
-          const obj = {};
-          header.forEach((h,j)=>{ obj[h] = (vals[j]||'').replace(/^"|"$/g,'').trim(); });
-          if(obj.fornecedor) rows.push(obj);
-        }
-        importRows = rows;
-        document.getElementById('importIcon').textContent = '✅';
-        document.getElementById('importLabel').textContent = file.name;
-        document.getElementById('importPreview').style.display = '';
-        document.getElementById('importInfo').innerHTML =
-          `<strong>${rows.length} faturas encontradas no ficheiro.</strong><br>` +
-          `Perfis presentes: ${[...new Set(rows.map(r=>r.perfil_nif||r.Perfil))].filter(Boolean).join(', ')||'—'}`;
-        document.getElementById('btnConfirmImport').disabled = false;
-      } catch(err) {
-        toast('❌ Erro ao ler CSV: ' + err.message, 'error');
-      }
-    };
-    reader.readAsText(file, 'utf-8');
-  });
-});
-
-async function confirmarImport(){
-  if(!importRows.length) return;
-  showLoader('A importar faturas…');
-  let importadas = 0, ignoradas = 0, erros = 0;
-  try {
-    for(const r of importRows){
-      // Mapear colunas (suporta backup completo e CSV filtrado)
-      const f = {
-        perfil_nif: r.perfil_nif || r.Perfil || perfilAtivo?.nif,
-        tipo: r.tipo || r.Tipo || 'compra',
-        nc_tipo: r.nc_tipo || null,
-        fornecedor: r.fornecedor || r.Fornecedor || '—',
-        nif: r.nif || r.NIF || '—',
-        numero: r.numero || r.Numero || '—',
-        data: r.data || r.Data || '—',
-        base_5: parseFloat(r.base_5||r.Base4||0)||0,
-        iva_5: parseFloat(r.iva_5||r.IVA4||0)||0,
-        base_12: parseFloat(r.base_12||r.Base12||0)||0,
-        iva_12: parseFloat(r.iva_12||r.IVA12||0)||0,
-        base_22: parseFloat(r.base_22||r.Base22||0)||0,
-        iva_22: parseFloat(r.iva_22||r.IVA22||0)||0,
-        base_isenta: parseFloat(r.base_isenta||r.BaseIsenta||0)||0,
-        base_estrangeira: parseFloat(r.base_estrangeira||r.BaseEstrang||0)||0,
-        iva_estrangeira: parseFloat(r.iva_estrangeira||r.IvaEstrang||0)||0,
-        total: parseFloat(r.total||r.Total||0)||0,
-        prestacoes: parseFloat(r.prestacoes||r.Prestacoes||0)||0,
-        isenta: (r.isenta||r.Estrangeira||'').toLowerCase()==='true'||false,
-        estrangeira: (r.estrangeira||r.Estrangeira||'').toLowerCase()==='sim'||false,
-        nota: r.nota||null,
-        ficheiro: r.ficheiro||'importado',
-      };
-      // Verificar duplicado
-      const dup = faturas.find(x=>
-        x.perfil_nif===f.perfil_nif && x.nif===f.nif && x.numero===f.numero && f.nif!=='—'
-      );
-      if(dup){ ignoradas++; continue; }
-      try {
-        const saved = await sbInsert(f);
-        faturas.unshift(saved);
-        importadas++;
-      } catch(e){ erros++; }
-    }
-    renderFaturas(); calcular();
-    fecharModal('modalImport');
-    toast(`✅ ${importadas} importadas · ${ignoradas} ignoradas (já existiam)${erros?' · '+erros+' erros':''}`, 'success');
-  } catch(e){ toast('❌ '+e.message,'error'); }
-  finally { hideLoader(); }
-}
-
 // ══════════════════════════════════════════════════
 // BACKUP COMPLETO
 // ══════════════════════════════════════════════════
@@ -2060,6 +1719,245 @@ function urlBase64ToUint8Array(base64String){
   return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
 }
 
+
+// ══════════════════════════════════════════════════
+// UPLOAD TABS
+// ══════════════════════════════════════════════════
+function showUploadTab(tab, el){
+  document.querySelectorAll('.upload-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.upload-pane').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('pane-'+tab).classList.add('active');
+}
+
+// ══════════════════════════════════════════════════
+// DUPLICADO
+// ══════════════════════════════════════════════════
+let _afterDupCallback = null;
+
+function checkDuplicado(f){
+  if(!f.numero||f.numero==='—'||!f.nif||f.nif==='—') return null;
+  return faturas.find(x =>
+    x.perfil_nif === f.perfil_nif &&
+    x.nif === f.nif &&
+    x.numero === f.numero
+  ) || null;
+}
+
+function mostrarAvisoDup(dup, callback){
+  document.getElementById('dup_fornecedor').textContent = dup.fornecedor||'—';
+  document.getElementById('dup_numero').textContent = dup.numero||'—';
+  document.getElementById('dup_data').textContent = dup.data||'—';
+  document.getElementById('dup_total').textContent = fmt(dup.total);
+  _afterDupCallback = callback;
+  document.getElementById('modalDup').classList.add('show');
+}
+
+async function continuarAposVerificacao(){
+  if(_afterDupCallback) await _afterDupCallback();
+  _afterDupCallback = null;
+}
+
+// ══════════════════════════════════════════════════
+// BATCH PROCESSING
+// ══════════════════════════════════════════════════
+let batchTipo = 'venda';
+let batchFiles = [];
+let batchRunning = false;
+
+function setBatchType(t){
+  batchTipo=t;
+  document.getElementById('batchBtnV').className='type-btn '+(t==='venda'?'av':'');
+  document.getElementById('batchBtnC').className='type-btn '+(t==='compra'?'ac':'');
+  document.getElementById('batchBtnN').className='type-btn '+(t==='nota_credito'?'an':'');
+}
+
+function loadBatchFiles(files){
+  batchFiles = Array.from(files);
+  const wrap = document.getElementById('batchQueueWrap');
+  wrap.style.display = '';
+  document.getElementById('batchProgress').textContent = '0 / '+batchFiles.length;
+  document.getElementById('batchBar').style.width = '0%';
+  document.getElementById('btnStartBatch').style.display = '';
+  document.getElementById('batchQueue').innerHTML = batchFiles.map((f,i)=>`
+    <div class="qrow waiting" id="qrow_${i}">
+      <div class="q-icon" id="qico_${i}">⏳</div>
+      <div class="q-name">${f.name}</div>
+      <div class="q-status" id="qst_${i}">À espera</div>
+    </div>`).join('');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const bfi = document.getElementById('batchFileInput');
+  const bdz = document.getElementById('batchDropZone');
+  if(bdz){
+    bdz.addEventListener('dragover',e=>{e.preventDefault();bdz.classList.add('dragover')});
+    bdz.addEventListener('dragleave',()=>bdz.classList.remove('dragover'));
+    bdz.addEventListener('drop',e=>{e.preventDefault();bdz.classList.remove('dragover');if(e.dataTransfer.files.length)loadBatchFiles(e.dataTransfer.files)});
+  }
+  if(bfi) bfi.addEventListener('change',()=>{if(bfi.files.length)loadBatchFiles(bfi.files)});
+
+  const bci = document.getElementById('batchCameraInput');
+  if(bci) bci.addEventListener('change', function(){
+    const file = this.files && this.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const arr = new Uint8Array(e.target.result);
+      const blob = new Blob([arr], {type: file.type||'image/jpeg'});
+      const fresh = new File([blob], file.name||'camera.jpg', {type: blob.type});
+      const dt = new DataTransfer();
+      dt.items.add(fresh);
+      loadBatchFiles(dt.files);
+    };
+    reader.readAsArrayBuffer(file);
+    bci.value='';
+  });
+
+  if(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 'ontouchstart' in window || navigator.maxTouchPoints>0){
+    const btnCam=document.getElementById('btnCamera');
+    const btnBCam=document.getElementById('btnBatchCamera');
+    if(btnCam) btnCam.style.display='';
+    if(btnBCam) btnBCam.style.display='';
+  }
+});
+
+async function startBatch(){
+  const apiKey = document.getElementById('apiKey').value.trim() || localStorage.getItem('fai_key') || '';
+  if(!apiKey){ toast('⚠️ Introduz a chave API','error'); abrirSettings(); return; }
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  if(batchRunning) return;
+  batchRunning = true;
+  document.getElementById('btnStartBatch').style.display = 'none';
+  let done=0, errors=0;
+  for(let i=0; i<batchFiles.length; i++){
+    const f = batchFiles[i];
+    const row = document.getElementById('qrow_'+i);
+    const ico = document.getElementById('qico_'+i);
+    const st = document.getElementById('qst_'+i);
+    row.className='qrow processing';
+    ico.innerHTML='<div class="q-spinner"></div>';
+    st.textContent='A processar…';
+    row.scrollIntoView({behavior:'smooth',block:'nearest'});
+    try {
+      tipoAtual = batchTipo;
+      const b64 = await toB64(f);
+      const isPDF = f.type==='application/pdf';
+      const cb = isPDF
+        ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
+        :{type:"image",source:{type:"base64",media_type:f.type||'image/jpeg',data:b64}};
+      const resp = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1000,messages:[{role:'user',content:[cb,{type:'text',text:buildPrompt()}]}]})
+      });
+      if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Erro API')}
+      const data = await resp.json();
+      let raw = data.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+      const p = JSON.parse(raw);
+      const fatura = {
+        tipo:batchTipo, perfil_nif:perfilAtivo.nif,
+        nc_tipo:batchTipo==='nota_credito'?'venda':null,
+        fornecedor:p.fornecedor||'—', nif:p.nif_fornecedor||'—',
+        numero:p.numero_fatura||'—', data:p.data||'—', isenta:!!p.isenta,
+        estrangeira:!!p.estrangeira, pais_origem:p.pais_origem||null,
+        base_5:+p.base_5||0, iva_5:+p.iva_5||0,
+        base_12:+p.base_12||0, iva_12:+p.iva_12||0,
+        base_22:+p.base_22||0, iva_22:+p.iva_22||0,
+        base_isenta:+p.base_isenta||0,
+        base_estrangeira:+p.base_estrangeira||0, iva_estrangeira:+p.iva_estrangeira||0,
+        total:+p.total||0, prestacoes:0, ficheiro:f.name
+      };
+      recalcTotais(fatura);
+      await guardarF(fatura);
+      done++;
+      row.className='qrow done';
+      ico.textContent='✅';
+      st.textContent=fatura.fornecedor !== '—' ? fatura.fornecedor : 'Guardada';
+    } catch(e) {
+      errors++;
+      row.className='qrow error';
+      ico.textContent='❌';
+      st.textContent=e.message.substring(0,40);
+    }
+    const pct = Math.round(((i+1)/batchFiles.length)*100);
+    document.getElementById('batchProgress').textContent=(i+1)+' / '+batchFiles.length;
+    document.getElementById('batchBar').style.width=pct+'%';
+    if(i < batchFiles.length-1) await new Promise(r=>setTimeout(r,800));
+  }
+  batchRunning = false;
+  toast('✅ Lote concluído — '+done+' guardadas'+(errors?' · '+errors+' erros':''), errors?'error':'success');
+  calcular();
+  setTimeout(()=>{
+    batchFiles=[];
+    document.getElementById('batchQueueWrap').style.display='none';
+    document.getElementById('batchFileInput').value='';
+  }, 4000);
+}
+
+// ══════════════════════════════════════════════════
+// FATURA MANUAL
+// ══════════════════════════════════════════════════
+let manualTipo = 'venda';
+
+function setManualType(t){
+  manualTipo=t;
+  document.getElementById('manBtnV').className='type-btn '+(t==='venda'?'av':'');
+  document.getElementById('manBtnC').className='type-btn '+(t==='compra'?'ac':'');
+  document.getElementById('manBtnN').className='type-btn '+(t==='nota_credito'?'an':'');
+}
+
+function calcManualIva(){
+  const b5=parseFloat(document.getElementById('man_base_5').value)||0;
+  const b12=parseFloat(document.getElementById('man_base_12').value)||0;
+  const b22=parseFloat(document.getElementById('man_base_22').value)||0;
+  const bi=parseFloat(document.getElementById('man_base_isenta').value)||0;
+  const i5=document.getElementById('man_iva_5');
+  const i12=document.getElementById('man_iva_12');
+  const i22=document.getElementById('man_iva_22');
+  const tot=document.getElementById('man_total');
+  i5.value = b5 ? (b5*0.04).toFixed(2) : '';
+  i12.value = b12 ? (b12*0.12).toFixed(2) : '';
+  i22.value = b22 ? (b22*0.22).toFixed(2) : '';
+  const iva=(parseFloat(i5.value)||0)+(parseFloat(i12.value)||0)+(parseFloat(i22.value)||0);
+  tot.value = (b5+b12+b22+bi+iva).toFixed(2);
+}
+
+async function guardarManual(){
+  const fornecedor=document.getElementById('man_fornecedor').value.trim();
+  const numero=document.getElementById('man_numero').value.trim();
+  const data=document.getElementById('man_data').value.trim();
+  if(!fornecedor||!numero||!data) return toast('⚠️ Preenche os campos obrigatórios (*)','error');
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  const b5=parseFloat(document.getElementById('man_base_5').value)||0;
+  const b12=parseFloat(document.getElementById('man_base_12').value)||0;
+  const b22=parseFloat(document.getElementById('man_base_22').value)||0;
+  const fatura = {
+    tipo: manualTipo, perfil_nif: perfilAtivo.nif,
+    nc_tipo: manualTipo==='nota_credito'?'venda':null,
+    fornecedor, nif: document.getElementById('man_nif').value.trim()||'—',
+    numero, data, isenta: (b5+b12+b22)===0,
+    estrangeira: false, pais_origem: null,
+    base_5:b5, iva_5:parseFloat(document.getElementById('man_iva_5').value)||+(b5*0.04).toFixed(2),
+    base_12:b12, iva_12:parseFloat(document.getElementById('man_iva_12').value)||+(b12*0.12).toFixed(2),
+    base_22:b22, iva_22:parseFloat(document.getElementById('man_iva_22').value)||+(b22*0.22).toFixed(2),
+    base_isenta:parseFloat(document.getElementById('man_base_isenta').value)||0,
+    base_estrangeira:0, iva_estrangeira:0,
+    total:parseFloat(document.getElementById('man_total').value)||0,
+    nota:document.getElementById('man_nota')?.value.trim()||null,
+    prestacoes:0, ficheiro:'manual'
+  };
+  recalcTotais(fatura);
+  showLoader('A guardar fatura manual…');
+  try {
+    await guardarF(fatura);
+    ['man_fornecedor','man_nif','man_numero','man_data','man_base_5','man_iva_5',
+     'man_base_12','man_iva_12','man_base_22','man_iva_22','man_base_isenta','man_total'
+    ].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    toast('✅ Fatura manual guardada!','success');
+  } catch(e){ toast('❌ '+e.message,'error'); }
+  finally { hideLoader(); }
+}
+
+
 </script>
-</body>
-</html>
