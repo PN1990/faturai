@@ -11,38 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="FaturaAI">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Syne+Mono&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
-// ══════════════════════════════════════════════════
-// CONFIGURAÇÕES
-// ══════════════════════════════════════════════════
-function abrirSettings(){
-  const saved = localStorage.getItem('fai_key') || '';
-  document.getElementById('apiKeyModal').value = saved;
-  // Sync estado da BD
-  const dot = document.getElementById('dbDotModal');
-  const lbl = document.getElementById('dbLblModal');
-  const srcDot = document.getElementById('dbDot');
-  if(dot && srcDot){
-    dot.className = srcDot.className;
-    lbl.textContent = document.getElementById('dbLbl')?.textContent || '…';
-  }
-  document.getElementById('modalSettings').classList.add('show');
-  setTimeout(()=>{ if(!saved) document.getElementById('apiKeyModal').focus(); }, 200);
-}
-
-function guardarApiKey(){
-  const k = document.getElementById('apiKeyModal').value.trim();
-  if(k){
-    localStorage.setItem('fai_key', k);
-    // Sync para o campo escondido na nav
-    const navKey = document.getElementById('apiKey');
-    if(navKey) navKey.value = k;
-  }
-  fecharModal('modalSettings');
-  toast('✅ Chave API guardada!', 'success');
-}
-
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -2031,6 +2000,39 @@ async function guardarManual(){
     toast('✅ Fatura manual guardada!','success');
   } catch(e){ toast('❌ '+e.message,'error'); }
   finally { hideLoader(); }
+}
+
+
+
+
+// ══════════════════════════════════════════════════
+// CONFIGURAÇÕES
+// ══════════════════════════════════════════════════
+function abrirSettings(){
+  const saved = localStorage.getItem('fai_key') || '';
+  document.getElementById('apiKeyModal').value = saved;
+  // Sync estado da BD
+  const dot = document.getElementById('dbDotModal');
+  const lbl = document.getElementById('dbLblModal');
+  const srcDot = document.getElementById('dbDot');
+  if(dot && srcDot){
+    dot.className = srcDot.className;
+    lbl.textContent = document.getElementById('dbLbl')?.textContent || '…';
+  }
+  document.getElementById('modalSettings').classList.add('show');
+  setTimeout(()=>{ if(!saved) document.getElementById('apiKeyModal').focus(); }, 200);
+}
+
+function guardarApiKey(){
+  const k = document.getElementById('apiKeyModal').value.trim();
+  if(k){
+    localStorage.setItem('fai_key', k);
+    // Sync para o campo escondido na nav
+    const navKey = document.getElementById('apiKey');
+    if(navKey) navKey.value = k;
+  }
+  fecharModal('modalSettings');
+  toast('✅ Chave API guardada!', 'success');
 }
 
 
