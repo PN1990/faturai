@@ -444,6 +444,27 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
 .color-pick{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.4rem}
 .cp{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
 .cp.sel{border-color:#fff;box-shadow:0 0 0 2px var(--text)}
+.upload-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.1rem}
+.upload-tab{padding:.55rem 1.1rem;font-family:'Syne',sans-serif;font-weight:700;font-size:.78rem;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.upload-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.upload-pane{display:none}
+.upload-pane.active{display:block}
+.queue-wrap{display:flex;flex-direction:column;gap:.4rem;max-height:320px;overflow-y:auto;margin-bottom:.85rem}
+.qrow{display:flex;align-items:center;gap:.7rem;padding:.65rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;transition:all .2s}
+.qrow.processing{background:var(--accent-light);border-color:rgba(26,58,42,.3)}
+.qrow.done{background:var(--success-light);border-color:rgba(45,92,66,.3);opacity:.7}
+.qrow.error{background:var(--danger-light);border-color:rgba(192,57,43,.3)}
+.qrow.waiting{opacity:.55}
+.q-icon{font-size:1.1rem;flex-shrink:0;width:22px;text-align:center}
+.q-name{flex:1;font-size:.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q-status{font-size:.7rem;font-family:'Syne Mono',monospace;color:var(--muted);white-space:nowrap}
+.q-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0}
+.progress-bar-wrap{height:4px;background:var(--border);border-radius:2px;margin:.6rem 0}
+.progress-bar{height:4px;background:var(--accent2);border-radius:2px;transition:width .4s ease}
+.dup-card{background:var(--danger-light);border:1.5px solid rgba(192,57,43,.25);border-radius:10px;padding:.9rem 1rem;margin-bottom:.85rem}
+.dup-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;color:var(--danger);margin-bottom:.4rem}
+.dup-row{display:flex;gap:.6rem;font-size:.78rem;color:var(--text);margin-bottom:.2rem}
+.dup-lbl{color:var(--muted);min-width:80px}
 @media(max-width:900px){
   .upload-layout,.decl-layout,.edit-grid{grid-template-columns:1fr}
   .decl-grid{grid-template-columns:1fr 1fr}
