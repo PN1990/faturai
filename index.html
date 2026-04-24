@@ -11,7 +11,38 @@
 <meta name="apple-mobile-web-app-title" content="FaturaAI">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Syne+Mono&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
+// ══════════════════════════════════════════════════
+// CONFIGURAÇÕES
+// ══════════════════════════════════════════════════
+function abrirSettings(){
+  const saved = localStorage.getItem('fai_key') || '';
+  document.getElementById('apiKeyModal').value = saved;
+  // Sync estado da BD
+  const dot = document.getElementById('dbDotModal');
+  const lbl = document.getElementById('dbLblModal');
+  const srcDot = document.getElementById('dbDot');
+  if(dot && srcDot){
+    dot.className = srcDot.className;
+    lbl.textContent = document.getElementById('dbLbl')?.textContent || '…';
+  }
+  document.getElementById('modalSettings').classList.add('show');
+  setTimeout(()=>{ if(!saved) document.getElementById('apiKeyModal').focus(); }, 200);
+}
+
+function guardarApiKey(){
+  const k = document.getElementById('apiKeyModal').value.trim();
+  if(k){
+    localStorage.setItem('fai_key', k);
+    // Sync para o campo escondido na nav
+    const navKey = document.getElementById('apiKey');
+    if(navKey) navKey.value = k;
+  }
+  fecharModal('modalSettings');
+  toast('✅ Chave API guardada!', 'success');
+}
+
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -481,6 +512,31 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
   </div>
 </div>
 
+<!-- MODAL: CONFIGURAÇÕES -->
+<div class="overlay" id="modalSettings">
+  <div class="modal" style="width:420px">
+    <div class="modal-hd" style="background:var(--accent)"><div class="modal-title">⚙️ Configurações</div></div>
+    <div class="modal-body">
+      <div class="edit-field" style="margin-bottom:1rem">
+        <label class="edit-label">🔑 Chave API Anthropic</label>
+        <input class="edit-input" type="password" id="apiKeyModal" placeholder="sk-ant-api03-…" autocomplete="off" />
+        <span style="font-size:.7rem;color:var(--muted);margin-top:.3rem;display:block">
+          Obtém a tua chave em <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">console.anthropic.com</a>.<br>
+          Guardada localmente no browser — nunca enviada para servidores.
+        </span>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center;padding:.65rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:8px">
+        <div class="db-dot" id="dbDotModal"></div>
+        <span id="dbLblModal" style="font-size:.78rem;font-family:'Syne Mono',monospace;color:var(--muted)">A verificar…</span>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-outline btn-sm" onclick="fecharModal('modalSettings')">Fechar</button>
+      <button class="btn btn-primary btn-sm" style="width:auto" onclick="guardarApiKey()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: IMPORTAR BACKUP -->
 <div class="overlay" id="modalImport">
   <div class="modal" style="width:480px">
@@ -618,6 +674,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
                 <div class="drop-label" id="dropLabel">Arrasta ou clica para selecionar</div>
                 <div class="drop-sub">PNG · JPG · WEBP · PDF</div>
                 <img id="prevImg" class="preview-img" style="display:none" />
+                <button id="btnClearFile" onclick="limparFicheiro(event)" style="display:none;position:absolute;top:.4rem;right:.4rem;background:var(--danger);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:.75rem;cursor:pointer;line-height:1;z-index:2" title="Remover ficheiro">✕</button>
               </div>
               <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" />
               <button class="btn btn-outline" id="btnCamera" onclick="document.getElementById('cameraInput').click()" style="width:100%;margin-top:.5rem;display:none">
@@ -919,11 +976,16 @@ async function carregarPerfis(){
 function renderPerfis(){
   const wrap=document.getElementById('perfilBtns');
   wrap.innerHTML=perfis.map(p=>`
-    <button class="pbtn${perfilAtivo?.nif===p.nif?' active':''}" 
-      style="${perfilAtivo?.nif===p.nif?'background:'+p.cor+';border-color:'+p.cor:''}"
-      onclick="mudarPerfil('${p.nif}')">
-      <span class="pbtn-dot" style="background:${p.cor}"></span>${p.nome}
-    </button>`).join('');
+    <div style="display:flex;align-items:center;gap:0">
+      <button class="pbtn${perfilAtivo?.nif===p.nif?' active':''}"
+        style="${perfilAtivo?.nif===p.nif?'background:'+p.cor+';border-color:'+p.cor:''};border-radius:999px 0 0 999px;border-right:none;padding-right:.6rem"
+        onclick="mudarPerfil('${p.nif}')">
+        <span class="pbtn-dot" style="background:${perfilAtivo?.nif===p.nif?'rgba(255,255,255,.7)':p.cor}"></span>${p.nome}
+      </button>
+      <div class="pbtn-actions" style="background:${perfilAtivo?.nif===p.nif?p.cor:'var(--bg)'};border:2px solid ${perfilAtivo?.nif===p.nif?p.cor:'var(--border)'};border-left:1px solid rgba(255,255,255,.2);border-radius:0 999px 999px 0;padding:.28rem .45rem;display:flex;align-items:center">
+        <button class="pbtn-action" title="Editar perfil" style="color:${perfilAtivo?.nif===p.nif?'rgba(255,255,255,.9)':'var(--muted)'};font-size:.8rem;background:none;border:none;cursor:pointer;padding:.1rem .2rem;line-height:1" onclick="abrirNovoPerfil('${p.nif}')">✏️</button>
+      </div>
+    </div>`).join('');
   document.getElementById('perfilNif').textContent=perfilAtivo?'NIF: '+perfilAtivo.nif:'';
   atualizarSubtitles();
 }
@@ -1030,6 +1092,18 @@ function handleFile(f){
   document.getElementById('dropIcon').textContent='✅';
   if(f.type.startsWith('image/')){const r=new FileReader();r.onload=e=>{const i=document.getElementById('prevImg');i.src=e.target.result;i.style.display='block'};r.readAsDataURL(f)}
   else document.getElementById('prevImg').style.display='none';
+  const btn=document.getElementById('btnClearFile');
+  if(btn) btn.style.display='';
+}
+
+function limparFicheiro(e){
+  e.preventDefault();e.stopPropagation();
+  document.getElementById('fileInput').value='';
+  document.getElementById('dropIcon').textContent='📂';
+  document.getElementById('dropLabel').textContent='Arrasta ou clica para selecionar';
+  document.getElementById('prevImg').style.display='none';
+  const btn=document.getElementById('btnClearFile');
+  if(btn) btn.style.display='none';
 }
 
 async function extractData(){
