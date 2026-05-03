@@ -1027,7 +1027,20 @@ async function loadFaturas(){
     toast('⚠️ Erro base de dados','error');
   }
 }
-async function sbInsert(f){const{data,error}=await sb.from('faturas').insert([f]).select().single();if(error)throw error;return data;}
+async function sbInsert(f){
+  const{data,error}=await sb.from('faturas').insert([f]).select().single();
+  if(error){
+    if(error.code==='23505'){
+      const existing=await sb.from('faturas').select('*').eq('perfil_nif',f.perfil_nif).eq('nif',f.nif).eq('numero',f.numero).single();
+      if(existing.data){
+        if(!faturas.find(x=>x.id===existing.data.id)) faturas.unshift(existing.data);
+        const err=new Error('DUPLICATE');err.dupData=existing.data;throw err;
+      }
+    }
+    throw error;
+  }
+  return data;
+}
 async function sbUpdate(id,f){const{error}=await sb.from('faturas').update(f).eq('id',id);if(error)throw error;}
 async function sbDelete(id){const{error}=await sb.from('faturas').delete().eq('id',id);if(error)throw error;}
 
@@ -1252,9 +1265,15 @@ async function guardarF(f, skipDupCheck=false){
     const dup = checkDuplicado(f);
     if(dup){ mostrarAvisoDup(dup, ()=>guardarF(f, true)); return; }
   }
-  const saved=await sbInsert(f);
-  faturas.unshift(saved);
-  renderFaturas();calcular();
+  try{
+    const saved=await sbInsert(f);
+    faturas.unshift(saved);
+    renderFaturas();calcular();
+  }catch(e){
+    if(e.message==='DUPLICATE'&&e.dupData){
+      mostrarAvisoDup(e.dupData, ()=>guardarF(f, true));
+    }else{ throw e; }
+  }
 }
 function resetUpload(){
   fi.value='';
@@ -1831,7 +1850,7 @@ async function startBatch(){
   if(batchRunning) return;
   batchRunning = true;
   document.getElementById('btnStartBatch').style.display = 'none';
-  let done=0, errors=0;
+  let done=0, errors=0, ignoradas=0;
   for(let i=0; i<batchFiles.length; i++){
     const f = batchFiles[i];
     const row = document.getElementById('qrow_'+i);
@@ -1871,11 +1890,21 @@ async function startBatch(){
         total:+p.total||0, prestacoes:0, ficheiro:f.name
       };
       recalcTotais(fatura);
-      await guardarF(fatura);
-      done++;
-      row.className='qrow done';
-      ico.textContent='✅';
-      st.textContent=fatura.fornecedor !== '—' ? fatura.fornecedor : 'Guardada';
+      // No batch, verificar duplicado silenciosamente (sem pop-up)
+      const dup = checkDuplicado(fatura);
+      if(dup){
+        row.className='qrow error';
+        ico.textContent='⚠️';
+        // Mostrar botão "Guardar mesmo assim" na linha
+        st.innerHTML='Já existe &nbsp;<button onclick="guardarFaturaBatch(this,'+JSON.stringify(fatura)+')" style="font-size:.65rem;padding:.15rem .45rem;background:var(--gold);color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:Syne,sans-serif;font-weight:700">Guardar mesmo assim</button>';
+        ignoradas++;
+      } else {
+        await guardarF(fatura, true); // skipDupCheck=true porque já verificámos
+        done++;
+        row.className='qrow done';
+        ico.textContent='✅';
+        st.textContent=fatura.fornecedor !== '—' ? fatura.fornecedor : 'Guardada';
+      }
     } catch(e) {
       errors++;
       row.className='qrow error';
@@ -1888,7 +1917,7 @@ async function startBatch(){
     if(i < batchFiles.length-1) await new Promise(r=>setTimeout(r,800));
   }
   batchRunning = false;
-  toast('✅ Lote concluído — '+done+' guardadas'+(errors?' · '+errors+' erros':''), errors?'error':'success');
+  toast('✅ Lote concluído — '+done+' guardadas'+(ignoradas?' · '+ignoradas+' já existiam':'')+(errors?' · '+errors+' erros':''), errors?'error':'success');
   calcular();
   setTimeout(()=>{
     batchFiles=[];
@@ -2017,6 +2046,27 @@ O campo base_22 deve conter APENAS servicos, nao prestacoes.
 NOTAS DE CREDITO: valores POSITIVOS (a app subtrai automaticamente).
 
 {"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}`;
+}
+
+
+// ══════════════════════════════════════════════════
+// BATCH: GUARDAR DUPLICADO MESMO ASSIM
+// ══════════════════════════════════════════════════
+async function guardarFaturaBatch(btn, fatura){
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    await guardarF(fatura, true);
+    const row = btn.closest('.qrow');
+    row.className = 'qrow done';
+    row.querySelector('.q-icon').textContent = '✅';
+    row.querySelector('.q-status').textContent = fatura.fornecedor || 'Guardada';
+    toast('✅ Fatura guardada!', 'success');
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Guardar mesmo assim';
+    toast('❌ ' + e.message, 'error');
+  }
 }
 
 </script>
