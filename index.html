@@ -1089,48 +1089,7 @@ async function extractData(){
       ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
       :{type:"image",source:{type:"base64",media_type:file.type||'image/jpeg',data:b64}};
 
-    const prompt=`Analisa esta fatura da Região Autónoma da Madeira (Portugal).
-Responde APENAS com JSON válido, sem markdown, sem texto extra.
-
-TAXAS MADEIRA 2025:
-- Taxa REDUZIDA = 4% (campo AT 01/02) — usada em produtos alimentares, medicamentos, etc.
-- Taxa INTERMÉDIA = 12% (campo AT 05/06) — usada em restauração, alguns serviços
-- Taxa NORMAL = 22% (campo AT 03/04) — usada na maioria dos serviços
-
-FATURAS ESTRANGEIRAS (campo 16 da AT):
-Booking.com, Airbnb, Google (Ads, Workspace), Meta/Facebook/Instagram Ads, Microsoft, Adobe, Spotify, Netflix, Amazon, Dropbox, e outras entidades com sede fora de Portugal são ESTRANGEIRAS.
-Se for estrangeira: base_estrangeira = valor sem IVA, iva_estrangeira = 22% da base.
-
-PRESTAÇÕES DE EQUIPAMENTO:
-Linhas de "amortização de equipamento", "prestação de telemóvel/router/tablet" são capital — NÃO são serviço faturado.
-Identifica-as em linhas_suspeitas.
-
-IMPORTANTE: Se a fatura tiver linhas de serviços E prestações, separa-as corretamente.
-O campo "base_22" deve conter APENAS o valor dos SERVIÇOS, não das prestações.
-
-NOTAS DE CRÉDITO: Se for uma nota de crédito/débito, os valores base e IVA devem ser POSITIVOS (a app subtrai automaticamente).
-
-{
-  "fornecedor": "nome",
-  "nif_fornecedor": "NIF ou null",
-  "numero_fatura": "número",
-  "data": "DD/MM/AAAA",
-  "isenta": false,
-  "estrangeira": false,
-  "pais_origem": null,
-  "base_5": 0,
-  "iva_5": 0,
-  "base_12": 0,
-  "iva_12": 0,
-  "base_22": 0,
-  "iva_22": 0,
-  "base_isenta": 0,
-  "base_estrangeira": 0,
-  "iva_estrangeira": 0,
-  "total": 0,
-  "tem_prestacoes": false,
-  "linhas_suspeitas": []
-}`;
+    const prompt=buildPrompt();
 
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -2035,5 +1994,29 @@ function guardarApiKey(){
   toast('✅ Chave API guardada!', 'success');
 }
 
+
+
+// ══════════════════════════════════════════════════
+// PROMPT IA
+// ══════════════════════════════════════════════════
+function buildPrompt(){
+  return `Analisa esta fatura da Região Autónoma da Madeira (Portugal).
+Responde APENAS com JSON válido, sem markdown, sem texto extra.
+
+TAXAS MADEIRA 2025:
+- Taxa REDUZIDA = 4% (campo AT 01/02)
+- Taxa INTERMEDIA = 12% (campo AT 05/06)
+- Taxa NORMAL = 22% (campo AT 03/04)
+
+FATURAS ESTRANGEIRAS (campo 16): Booking.com, Airbnb, Google, Meta, Microsoft, Adobe e similares.
+Se estrangeira: base_estrangeira = valor sem IVA, iva_estrangeira = 22% da base.
+
+PRESTACOES: Linhas de amortizacao de equipamento, prestacao de telemovel/router — identifica em linhas_suspeitas.
+O campo base_22 deve conter APENAS servicos, nao prestacoes.
+
+NOTAS DE CREDITO: valores POSITIVOS (a app subtrai automaticamente).
+
+{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}`;
+}
 
 </script>
