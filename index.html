@@ -830,8 +830,8 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
             </div>
             <div class="decl-sec">Taxa Normal — 22%</div>
             <div class="decl-grid">
-              <div class="df hg"><div class="fn g">24</div><div class="fi"><div class="fl">Base dedutível (22%)</div><div class="fv g" id="d24">0,00 €</div></div></div>
-              <div class="df hg"><div class="fn g">25</div><div class="fi"><div class="fl">IVA dedutível (22%)</div><div class="fv g" id="d25">0,00 €</div></div></div>
+              <div class="df hg"><div class="fn g">24</div><div class="fi"><div class="fl">Base dedutível (22%) + autoliq.</div><div class="fv g" id="d24">0,00 €</div></div></div>
+              <div class="df hg"><div class="fn g">25</div><div class="fi"><div class="fl">IVA dedutível (22%) + autoliq.</div><div class="fv g" id="d25">0,00 €</div></div></div>
             </div>
             <div class="decl-sec">Totais</div>
             <div class="decl-grid">
@@ -1406,9 +1406,12 @@ function calcular(){
   const cb12=s(c,'base_12')-s(ncc,'base_12'),ci12=s(c,'iva_12')-s(ncc,'iva_12');
   const cb22=s(c,'base_22')-s(ncc,'base_22'),ci22=s(c,'iva_22')-s(ncc,'iva_22');
   const cbt=cb5+cb12+cb22, cit=ci5+ci12+ci22;
+  // Autoliquidação (campo 16/17): o IVA estrangeiro liquidado é também dedutível (campo 24/25)
+  // Adicionamos a base e IVA estrangeiros aos campos 24/25 (22%)
+  const cb22_ext=vbe, ci22_ext=vie;
 
   const c96=parseFloat(document.getElementById('campo96').value)||0;
-  const c61=vit, c65=cit, c67=c96;
+  const c61=vit, c65=cit+ci22_ext, c67=c96;
   const resultado=c61-c65-c67;
 
   const sf=(id,val,z,cls)=>{const el=document.getElementById(id);if(!el)return;el.textContent=fmt(val);el.className='fv'+(z?' z':'')+(cls?' '+cls:'');};
@@ -1420,8 +1423,8 @@ function calcular(){
   sf('d10',vbt,vbt===0); sf('d11',vit,vit===0,'g');
   sf('d20',cb5,cb5===0,'g'); sf('d21',ci5,ci5===0,'g');
   sf('d22',cb12,cb12===0,'g'); sf('d23',ci12,ci12===0,'g');
-  sf('d24',cb22,cb22===0,'g'); sf('d25',ci22,ci22===0,'g');
-  sf('d32',cbt,cbt===0,'g'); sf('d33',cit,cit===0,'g');
+  sf('d24',cb22+cb22_ext,( cb22+cb22_ext)===0,'g'); sf('d25',ci22+ci22_ext,(ci22+ci22_ext)===0,'g');
+  sf('d32',cbt+cb22_ext,(cbt+cb22_ext)===0,'g'); sf('d33',cit+ci22_ext,(cit+ci22_ext)===0,'g');
   sf('d61',c61,false,'g'); sf('d65',c65,false,'g'); sf('d67',c67,c67===0,'g');
 
   if(resultado>=0){
@@ -1445,7 +1448,7 @@ function calcular(){
   document.getElementById('s_vv').textContent=fmt(s(v,'total'));
   document.getElementById('s_vc').textContent=fmt(s(c,'total'));
   document.getElementById('s_il').textContent=fmt(vit);
-  document.getElementById('s_id').textContent=fmt(cit);
+  document.getElementById('s_id').textContent=fmt(cit+ci22_ext);
   document.getElementById('s_ex').textContent=fmt(c96);
 
   const box=document.getElementById('resBox'),lbl=document.getElementById('resLbl'),val=document.getElementById('resVal');
