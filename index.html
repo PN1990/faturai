@@ -1182,15 +1182,14 @@ async function extractData(){
         const nc=p.nota_credito_incluida;
         const fNC={
           tipo:'nota_credito', perfil_nif:perfilAtivo.nif, nc_tipo:'compra',
-          fornecedor:nc.fornecedor||pendingF.fornecedor,
-          nif:nc.nif||pendingF.nif,
+          fornecedor:nc.fornecedor||pendingF.fornecedor, nif:nc.nif||pendingF.nif,
           numero:nc.numero||'—', data:nc.data||pendingF.data,
           isenta:false, estrangeira:false, pais_origem:null,
-          base_5:0, iva_5:0, base_12:0, iva_12:0,
+          base_5:+nc.base_5||0, iva_5:+nc.iva_5||0,
+          base_12:+nc.base_12||0, iva_12:+nc.iva_12||0,
           base_22:+nc.base_22||0, iva_22:+nc.iva_22||0,
           base_isenta:0, base_estrangeira:0, iva_estrangeira:0,
-          total:+nc.total||0, prestacoes:0, nota:null,
-          ficheiro:file.name
+          total:+nc.total||0, prestacoes:0, nota:null, ficheiro:file.name
         };
         recalcTotais(fNC);
         await guardarF(fNC);
@@ -1373,7 +1372,7 @@ function getFiltradas(){
   }
   // Ordenação
   const ordem = document.getElementById('filterOrdem')?.value || 'data_desc';
-  if(ordem==='recente'){ /* manter ordem do Supabase — created_at desc */ }
+  if(ordem==='recente'){ /* manter ordem Supabase */ }
   else if(ordem==='data_desc') list.sort((a,b)=>{ const da=a.data?.split('/').reverse().join('')||''; const db=b.data?.split('/').reverse().join('')||''; return db.localeCompare(da); });
   else if(ordem==='data_asc') list.sort((a,b)=>{ const da=a.data?.split('/').reverse().join('')||''; const db=b.data?.split('/').reverse().join('')||''; return da.localeCompare(db); });
   else if(ordem==='total_desc') list.sort((a,b)=>(parseFloat(b.total)||0)-(parseFloat(a.total)||0));
@@ -2113,7 +2112,10 @@ O campo base_22 deve conter APENAS servicos, nao prestacoes.
 
 NOTAS DE CREDITO: valores POSITIVOS (a app subtrai automaticamente).
 
-{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}],"nota_credito_incluida":{"tem":false,"fornecedor":"","nif":"","numero":"","data":"","base_22":0,"iva_22":0,"total":0}}`;
+DOCUMENTO COM FATURA + NOTA DE CREDITO (ex: NOS, MEO):
+Se o PDF contiver UMA FATURA e UMA NOTA DE CREDITO separadas, preenche o campo "nota_credito_incluida".
+
+{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}],"nota_credito_incluida":{"tem":false,"fornecedor":"","nif":"","numero":"","data":"","base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"total":0}}`;
 }
 
 
