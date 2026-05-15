@@ -743,8 +743,9 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
           <span class="chip nc" data-f="nota_credito" onclick="setChip(this,'nota_credito')">↩️ N. Crédito</span>
         </div>
         <select class="filter-sel" id="filterOrdem" onchange="renderFaturas()">
-          <option value="data_desc">↓ Data</option>
-          <option value="data_asc">↑ Data</option>
+          <option value="recente">⬇ Mais recente</option>
+          <option value="data_desc">↓ Data fatura</option>
+          <option value="data_asc">↑ Data fatura</option>
           <option value="total_desc">↓ Valor</option>
           <option value="total_asc">↑ Valor</option>
           <option value="fornecedor_asc">A→Z Fornecedor</option>
@@ -1140,8 +1141,47 @@ async function extractData(){
     if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Erro API')}
     const data=await resp.json();
     let raw=data.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
-    const p=JSON.parse(raw);
+    let parsed=JSON.parse(raw);
+    // Normalizar para array (a IA pode devolver array ou objecto único)
+    const docs=Array.isArray(parsed)?parsed:[parsed];
 
+    hideLoader();
+
+    // Se tem mais de um documento (fatura + NC no mesmo PDF)
+    if(docs.length>1){
+      const nomes={venda:'Venda',compra:'Compra',nota_credito:'N. Crédito'};
+      const resumo=docs.map((d,i)=>`${i+1}. ${d.e_nota_credito?'↩️ Nota Crédito':'📄 Fatura'} — ${d.fornecedor||'?'} — ${d.numero_fatura||'?'} — ${d.total||0}€`).join('\n');
+      if(!confirm('A IA detetou '+docs.length+' documentos neste PDF:\n\n'+resumo+'\n\nGuardar ambos automaticamente?')){
+        resetUpload();return;
+      }
+      let saved=0;
+      for(const d of docs){
+        const tipoDoc=d.e_nota_credito?'nota_credito':tipoAtual;
+        const f={
+          tipo:tipoDoc,perfil_nif:perfilAtivo.nif,
+          nc_tipo:tipoDoc==='nota_credito'?'compra':null,
+          fornecedor:d.fornecedor||'—',nif:d.nif_fornecedor||'—',
+          numero:d.numero_fatura||'—',data:d.data||'—',isenta:!!d.isenta,
+          estrangeira:!!d.estrangeira,pais_origem:d.pais_origem||null,
+          base_5:+d.base_5||0,iva_5:+d.iva_5||0,
+          base_12:+d.base_12||0,iva_12:+d.iva_12||0,
+          base_22:+d.base_22||0,iva_22:+d.iva_22||0,
+          base_isenta:+d.base_isenta||0,
+          base_estrangeira:+d.base_estrangeira||0,
+          iva_estrangeira:(+d.iva_estrangeira||0)>0?(+d.iva_estrangeira):(+d.base_estrangeira||0)*0.22,
+          total:+d.total||0,prestacoes:0,ficheiro:file.name
+        };
+        recalcTotais(f);
+        await guardarF(f);
+        saved++;
+      }
+      resetUpload();
+      toast('✅ '+saved+' documentos guardados (fatura + nota de crédito)!','success');
+      return;
+    }
+
+    // Documento único — fluxo normal
+    const p=docs[0];
     pendingF={
       tipo:tipoAtual,perfil_nif:perfilAtivo.nif,
       nc_tipo:tipoAtual==='nota_credito'?'venda':null,
@@ -1158,7 +1198,6 @@ async function extractData(){
     };
     recalcTotais(pendingF);
     pendingLinhas=p.linhas_suspeitas||[];
-    hideLoader();
 
     // If NC, ask which side it affects before proceeding
     if(tipoAtual==='nota_credito'){
@@ -1350,7 +1389,8 @@ function getFiltradas(){
   }
   // Ordenação
   const ordem = document.getElementById('filterOrdem')?.value || 'data_desc';
-  if(ordem==='data_desc') list.sort((a,b)=>{ const da=a.data?.split('/').reverse().join('')||''; const db=b.data?.split('/').reverse().join('')||''; return db.localeCompare(da); });
+  if(ordem==='recente') { /* manter ordem original — já vem do Supabase por created_at desc */ }
+  else if(ordem==='data_desc') list.sort((a,b)=>{ const da=a.data?.split('/').reverse().join('')||''; const db=b.data?.split('/').reverse().join('')||''; return db.localeCompare(da); });
   else if(ordem==='data_asc') list.sort((a,b)=>{ const da=a.data?.split('/').reverse().join('')||''; const db=b.data?.split('/').reverse().join('')||''; return da.localeCompare(db); });
   else if(ordem==='total_desc') list.sort((a,b)=>(parseFloat(b.total)||0)-(parseFloat(a.total)||0));
   else if(ordem==='total_asc') list.sort((a,b)=>(parseFloat(a.total)||0)-(parseFloat(b.total)||0));
@@ -2089,7 +2129,13 @@ O campo base_22 deve conter APENAS servicos, nao prestacoes.
 
 NOTAS DE CREDITO: valores POSITIVOS (a app subtrai automaticamente).
 
-{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}`;
+DOCUMENTO COM FATURA + NOTA DE CRÉDITO (ex: NOS, MEO):
+Alguns documentos contêm uma fatura E uma nota de crédito no mesmo PDF.
+Nesse caso devolve um array com dois objetos: primeiro a fatura, depois a nota de crédito.
+A nota de crédito deve ter "e_nota_credito": true e valores POSITIVOS.
+Se for só uma fatura, devolve um array com um único objeto.
+
+[{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","e_nota_credito":false,"isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}]`;
 }
 
 
