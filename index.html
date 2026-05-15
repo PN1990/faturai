@@ -744,8 +744,8 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         </div>
         <select class="filter-sel" id="filterOrdem" onchange="renderFaturas()">
           <option value="recente">⬇ Mais recente</option>
-          <option value="data_desc">↓ Data fatura</option>
-          <option value="data_asc">↑ Data fatura</option>
+          <option value="data_desc">↓ Data</option>
+          <option value="data_asc">↑ Data</option>
           <option value="total_desc">↓ Valor</option>
           <option value="total_asc">↑ Valor</option>
           <option value="fornecedor_asc">A→Z Fornecedor</option>
@@ -1141,80 +1141,76 @@ async function extractData(){
     if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Erro API')}
     const data=await resp.json();
     let raw=data.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
-    let parsed=JSON.parse(raw);
-    // Normalizar para array (a IA pode devolver array ou objecto único)
-    const docs=Array.isArray(parsed)?parsed:[parsed];
+    let parsed;
+    try { parsed=JSON.parse(raw); } catch(e){ hideLoader(); toast('❌ Erro a interpretar resposta da IA','error'); return; }
 
+    // Normalizar: a IA devolve sempre array, mas por segurança aceitar objeto também
+    const docs=Array.isArray(parsed)?parsed:[parsed];
     hideLoader();
 
-    // Se tem mais de um documento (fatura + NC no mesmo PDF)
+    // Vários documentos no mesmo PDF (ex: NOS fatura + NC)
     if(docs.length>1){
-      const nomes={venda:'Venda',compra:'Compra',nota_credito:'N. Crédito'};
-      const resumo=docs.map((d,i)=>`${i+1}. ${d.e_nota_credito?'↩️ Nota Crédito':'📄 Fatura'} — ${d.fornecedor||'?'} — ${d.numero_fatura||'?'} — ${d.total||0}€`).join('\n');
-      if(!confirm('A IA detetou '+docs.length+' documentos neste PDF:\n\n'+resumo+'\n\nGuardar ambos automaticamente?')){
-        resetUpload();return;
+      const linhas=docs.map((d,i)=>`${i+1}. ${d.e_nota_credito?'↩️ N.Crédito':'📄 Fatura'} — ${d.fornecedor||'?'} — nº ${d.numero_fatura||'?'} — ${d.total||0}€`).join('\n');
+      if(!confirm('A IA detetou '+docs.length+' documentos neste PDF:\n\n'+linhas+'\n\nGuardar ambos automaticamente?')){
+        resetUpload(); return;
       }
       let saved=0;
       for(const d of docs){
         const tipoDoc=d.e_nota_credito?'nota_credito':tipoAtual;
         const f={
-          tipo:tipoDoc,perfil_nif:perfilAtivo.nif,
+          tipo:tipoDoc, perfil_nif:perfilAtivo.nif,
           nc_tipo:tipoDoc==='nota_credito'?'compra':null,
-          fornecedor:d.fornecedor||'—',nif:d.nif_fornecedor||'—',
-          numero:d.numero_fatura||'—',data:d.data||'—',isenta:!!d.isenta,
-          estrangeira:!!d.estrangeira,pais_origem:d.pais_origem||null,
-          base_5:+d.base_5||0,iva_5:+d.iva_5||0,
-          base_12:+d.base_12||0,iva_12:+d.iva_12||0,
-          base_22:+d.base_22||0,iva_22:+d.iva_22||0,
+          fornecedor:d.fornecedor||'—', nif:d.nif_fornecedor||'—',
+          numero:d.numero_fatura||'—', data:d.data||'—', isenta:!!d.isenta,
+          estrangeira:!!d.estrangeira, pais_origem:d.pais_origem||null,
+          base_5:+d.base_5||0, iva_5:+d.iva_5||0,
+          base_12:+d.base_12||0, iva_12:+d.iva_12||0,
+          base_22:+d.base_22||0, iva_22:+d.iva_22||0,
           base_isenta:+d.base_isenta||0,
           base_estrangeira:+d.base_estrangeira||0,
           iva_estrangeira:(+d.iva_estrangeira||0)>0?(+d.iva_estrangeira):(+d.base_estrangeira||0)*0.22,
-          total:+d.total||0,prestacoes:0,ficheiro:file.name
+          total:+d.total||0, prestacoes:0, ficheiro:file.name
         };
         recalcTotais(f);
         await guardarF(f);
         saved++;
       }
       resetUpload();
-      toast('✅ '+saved+' documentos guardados (fatura + nota de crédito)!','success');
+      toast('✅ '+saved+' documentos guardados!','success');
       return;
     }
 
     // Documento único — fluxo normal
     const p=docs[0];
     pendingF={
-      tipo:tipoAtual,perfil_nif:perfilAtivo.nif,
+      tipo:tipoAtual, perfil_nif:perfilAtivo.nif,
       nc_tipo:tipoAtual==='nota_credito'?'venda':null,
-      fornecedor:p.fornecedor||'—',nif:p.nif_fornecedor||'—',
-      numero:p.numero_fatura||'—',data:p.data||'—',isenta:!!p.isenta,
-      estrangeira:!!p.estrangeira,pais_origem:p.pais_origem||null,
-      base_5:+p.base_5||0,iva_5:+p.iva_5||0,
-      base_12:+p.base_12||0,iva_12:+p.iva_12||0,
-      base_22:+p.base_22||0,iva_22:+p.iva_22||0,
+      fornecedor:p.fornecedor||'—', nif:p.nif_fornecedor||'—',
+      numero:p.numero_fatura||'—', data:p.data||'—', isenta:!!p.isenta,
+      estrangeira:!!p.estrangeira, pais_origem:p.pais_origem||null,
+      base_5:+p.base_5||0, iva_5:+p.iva_5||0,
+      base_12:+p.base_12||0, iva_12:+p.iva_12||0,
+      base_22:+p.base_22||0, iva_22:+p.iva_22||0,
       base_isenta:+p.base_isenta||0,
       base_estrangeira:+p.base_estrangeira||0,
       iva_estrangeira:(+p.iva_estrangeira||0)>0?(+p.iva_estrangeira):(+p.base_estrangeira||0)*0.22,
-      total:+p.total||0,prestacoes:0,ficheiro:file.name
+      total:+p.total||0, prestacoes:0, ficheiro:file.name
     };
     recalcTotais(pendingF);
     pendingLinhas=p.linhas_suspeitas||[];
 
-    // If NC, ask which side it affects before proceeding
-    if(tipoAtual==='nota_credito'){
-      abrirModalNC();
-      return;
-    }
+    if(tipoAtual==='nota_credito'){ abrirModalNC(); return; }
 
     if(p.estrangeira&&p.base_estrangeira>0){
       document.getElementById('estNome').value=p.fornecedor||'';
       document.getElementById('estPais').value=p.pais_origem||'';
       document.getElementById('estBase').value=p.base_estrangeira||'';
-      document.getElementById('estIva').value=p.iva_estrangeira||'';
+      document.getElementById('estIva').value=((+p.iva_estrangeira||0)>0?+p.iva_estrangeira:(+p.base_estrangeira||0)*0.22).toFixed(2);
       document.getElementById('modalEstrang').classList.add('show');
     } else if(p.tem_prestacoes&&pendingLinhas.length>0){
       abrirPrest();
     } else {
-      await guardarF(pendingF);resetUpload();toast('✅ Fatura guardada!','success');
+      await guardarF(pendingF); resetUpload(); toast('✅ Fatura guardada!','success');
     }
   }catch(e){hideLoader();toast('❌ '+e.message,'error');}
 }
@@ -1389,7 +1385,7 @@ function getFiltradas(){
   }
   // Ordenação
   const ordem = document.getElementById('filterOrdem')?.value || 'data_desc';
-  if(ordem==='recente') { /* manter ordem original — já vem do Supabase por created_at desc */ }
+  if(ordem==='recente'){ /* manter ordem do Supabase (created_at desc) */ }
   else if(ordem==='data_desc') list.sort((a,b)=>{ const da=a.data?.split('/').reverse().join('')||''; const db=b.data?.split('/').reverse().join('')||''; return db.localeCompare(da); });
   else if(ordem==='data_asc') list.sort((a,b)=>{ const da=a.data?.split('/').reverse().join('')||''; const db=b.data?.split('/').reverse().join('')||''; return da.localeCompare(db); });
   else if(ordem==='total_desc') list.sort((a,b)=>(parseFloat(b.total)||0)-(parseFloat(a.total)||0));
@@ -2124,16 +2120,15 @@ TAXAS MADEIRA 2025:
 FATURAS ESTRANGEIRAS (campo 16): Booking.com, Airbnb, Google, Meta, Microsoft, Adobe e similares.
 Se estrangeira: base_estrangeira = valor sem IVA, iva_estrangeira = 22% da base.
 
-PRESTACOES: Linhas de amortizacao de equipamento, prestacao de telemovel/router — identifica em linhas_suspeitas.
+PRESTACOES: Linhas de amortizacao de equipamento, prestacao de telemovel/router — identifica em linhas_suspeitas com descricao, motivo, valor, iva.
 O campo base_22 deve conter APENAS servicos, nao prestacoes.
 
-NOTAS DE CREDITO: valores POSITIVOS (a app subtrai automaticamente).
+DOCUMENTO COM FATURA + NOTA DE CREDITO (ex: NOS, MEO):
+Se o PDF contiver UMA FATURA e UMA NOTA DE CREDITO separadas, devolve um ARRAY com dois objetos.
+O segundo objeto deve ter "e_nota_credito": true e valores POSITIVOS.
+Se for apenas um documento, devolve um ARRAY com um unico objeto.
 
-DOCUMENTO COM FATURA + NOTA DE CRÉDITO (ex: NOS, MEO):
-Alguns documentos contêm uma fatura E uma nota de crédito no mesmo PDF.
-Nesse caso devolve um array com dois objetos: primeiro a fatura, depois a nota de crédito.
-A nota de crédito deve ter "e_nota_credito": true e valores POSITIVOS.
-Se for só uma fatura, devolve um array com um único objeto.
+NOTAS DE CREDITO standalone: valores POSITIVOS (a app subtrai automaticamente).
 
 [{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","e_nota_credito":false,"isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}]`;
 }
