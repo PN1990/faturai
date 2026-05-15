@@ -1131,7 +1131,7 @@ async function extractData(){
       ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
       :{type:"image",source:{type:"base64",media_type:file.type||'image/jpeg',data:b64}};
 
-    const prompt=buildPrompt();
+    const prompt=buildPrompt('fatura');
 
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1177,26 +1177,43 @@ async function extractData(){
       abrirPrest();
     } else {
       await guardarF(pendingF);
-      // Verificar se o PDF tinha uma NC incluída (ex: NOS, MEO)
-      if(p.nota_credito_incluida?.tem){
-        const nc=p.nota_credito_incluida;
-        const fNC={
-          tipo:'nota_credito', perfil_nif:perfilAtivo.nif, nc_tipo:'compra',
-          fornecedor:nc.fornecedor||pendingF.fornecedor, nif:nc.nif||pendingF.nif,
-          numero:nc.numero||'—', data:nc.data||pendingF.data,
-          isenta:false, estrangeira:false, pais_origem:null,
-          base_5:+nc.base_5||0, iva_5:+nc.iva_5||0,
-          base_12:+nc.base_12||0, iva_12:+nc.iva_12||0,
-          base_22:+nc.base_22||0, iva_22:+nc.iva_22||0,
-          base_isenta:0, base_estrangeira:0, iva_estrangeira:0,
-          total:+nc.total||0, prestacoes:0, nota:null, ficheiro:file.name
-        };
-        recalcTotais(fNC);
-        await guardarF(fNC);
-        resetUpload();
-        toast('✅ Fatura + Nota de Crédito guardadas!','success');
+      // Se tem NC no mesmo PDF, fazer 2a chamada a IA focada so na NC
+      if(p.tem_nota_credito){
+        showLoader('A extrair Nota de Credito...');
+        try{
+          const resp2=await fetch('https://api.anthropic.com/v1/messages',{
+            method:'POST',
+            headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+            body:JSON.stringify({model:'claude-opus-4-6',max_tokens:800,messages:[{role:'user',content:[cb,{type:'text',text:buildPrompt('nc')}]}]})
+          });
+          if(resp2.ok){
+            const data2=await resp2.json();
+            let raw2=data2.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+            const nc=JSON.parse(raw2);
+            if(nc.tem!==false){
+              const fNC={
+                tipo:'nota_credito', perfil_nif:perfilAtivo.nif, nc_tipo:'compra',
+                fornecedor:nc.fornecedor||pendingF.fornecedor,
+                nif:nc.nif_fornecedor||pendingF.nif,
+                numero:nc.numero_fatura||'--', data:nc.data||pendingF.data,
+                isenta:false, estrangeira:false, pais_origem:null,
+                base_5:+nc.base_5||0, iva_5:+nc.iva_5||0,
+                base_12:+nc.base_12||0, iva_12:+nc.iva_12||0,
+                base_22:+nc.base_22||0, iva_22:+nc.iva_22||0,
+                base_isenta:+nc.base_isenta||0,
+                base_estrangeira:0, iva_estrangeira:0,
+                total:+nc.total||0, prestacoes:0, nota:null, ficheiro:file.name
+              };
+              recalcTotais(fNC);
+              await guardarF(fNC);
+              resetUpload();
+              toast('Fatura + Nota de Credito guardadas!','success');
+            } else { resetUpload();toast('Fatura guardada!','success'); }
+          }
+        }catch(e2){ resetUpload();toast('Fatura guardada (NC: '+e2.message+')','info'); }
+        finally{ hideLoader(); }
       } else {
-        resetUpload();toast('✅ Fatura guardada!','success');
+        resetUpload();toast('Fatura guardada!','success');
       }
     }
   }catch(e){hideLoader();toast('❌ '+e.message,'error');}
@@ -1936,7 +1953,7 @@ async function startBatch(){
       const resp = await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
         headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1000,messages:[{role:'user',content:[cb,{type:'text',text:buildPrompt()}]}]})
+        body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1000,messages:[{role:'user',content:[cb,{type:'text',text:buildPrompt('fatura')}]}]})
       });
       if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Erro API')}
       const data = await resp.json();
@@ -2095,30 +2112,28 @@ function guardarApiKey(){
 // ══════════════════════════════════════════════════
 // PROMPT IA
 // ══════════════════════════════════════════════════
-function buildPrompt(){
-  return `Analisa este documento fiscal da Região Autónoma da Madeira (Portugal).
-Responde APENAS com JSON válido, sem markdown, sem texto extra.
+function buildPrompt(modo){
+  const base=`Analisa este documento fiscal da Regiao Autonoma da Madeira (Portugal).
+Responde APENAS com JSON valido, sem markdown, sem texto extra.
+TAXAS MADEIRA 2025: Reduzida=4%, Intermedia=12%, Normal=22%.
+FATURAS ESTRANGEIRAS campo 16: Booking.com, Airbnb, Google, Meta, Microsoft, Adobe.
+Se estrangeira: base_estrangeira=valor sem IVA, iva_estrangeira=22% da base.
+PRESTACOES: amortizacoes de equipamento em linhas_suspeitas. base_22=so servicos.`;
 
-TAXAS MADEIRA 2025:
-- Taxa REDUZIDA = 4% (campo AT 01/02)
-- Taxa INTERMEDIA = 12% (campo AT 05/06)
-- Taxa NORMAL = 22% (campo AT 03/04)
+  if(modo==='nc') return base+`
 
-FATURAS ESTRANGEIRAS (campo 16): Booking.com, Airbnb, Google, Meta, Microsoft, Adobe e similares.
-Se estrangeira: base_estrangeira = valor sem IVA, iva_estrangeira = 22% da base.
+INSTRUCAO: Este PDF tem FATURA e NOTA DE CREDITO. Extrai SO a NOTA DE CREDITO (seccao "NOTA CREDITO NO." ou "NOTA DE CREDITO NO."). Ignora a fatura. Se nao existir NC, devolve {"tem":false}.
+{"tem":true,"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"total":0}`;
 
-PRESTACOES: Linhas de amortizacao de equipamento, prestacao de telemovel/router — identifica em linhas_suspeitas.
-O campo base_22 deve conter APENAS servicos, nao prestacoes.
+  return base+`
 
-DOCUMENTO COM FATURA + NOTA DE CREDITO NO MESMO PDF (ex: NOS, MEO):
-Alguns PDFs contêm uma FACTURA e uma NOTA DE CREDITO separadas.
-- O campo principal (fornecedor, numero_fatura, base_22, iva_22, total, etc.) refere-se SEMPRE à FACTURA principal (identificada como "FACTURA NO." ou "FATURA NO.").
-- Se existir também uma NOTA DE CREDITO (identificada como "NOTA CREDITO NO." ou "NOTA DE CREDITO"), preenche "nota_credito_incluida" com os valores DESSA NOTA DE CREDITO e coloca "tem": true.
-- NUNCA mistures os valores da fatura com os da nota de crédito no campo principal.
+INSTRUCAO CRITICA: Se o PDF tiver FATURA+NC juntas (como os PDFs da NOS ou MEO que incluem "FACTURA NO." e depois "NOTA CREDITO NO."):
+- Extrai APENAS a FATURA PRINCIPAL - os valores da linha "FACTURA NO." e "TOTAL DA FACTURA"
+- NAO uses os valores da "NOTA CREDITO" no campo principal
+- Coloca "tem_nota_credito":true para que a app faça uma segunda extracao da NC
+- Exemplo correcto para NOS: FACTURA NO.022178709 total=34.00, NOTA CREDITO NO.051536008 total=2.76 → numero_fatura="022178709", total=34.00, tem_nota_credito=true
 
-Exemplo NOS: FACTURA NO.: 022178709 total 34€ → campo principal. NOTA CREDITO NO.: 051536008 total 2.76€ → nota_credito_incluida.
-
-{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}],"nota_credito_incluida":{"tem":false,"numero":"","data":"","base_22":0,"iva_22":0,"total":0}}`;
+{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"tem_nota_credito":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}`;
 }
 
 
