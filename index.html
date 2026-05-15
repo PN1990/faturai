@@ -880,7 +880,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
               <div class="df hg full"><div class="fn g">67</div><div class="fi"><div class="fl">Excesso período anterior (campo 96)</div><div class="fv g" id="d67">0,00 €</div></div></div>
               <div class="df full hl" id="d93wrap"><div class="fn">93</div><div class="fi"><div class="fl">IVA a pagar (61 − 65 − 67)</div><div class="fv r" id="d93">0,00 €</div></div></div>
               <div class="df full hg" id="d94wrap" style="display:none"><div class="fn g">94</div><div class="fi"><div class="fl">Excesso a reportar (65 + 67 − 61)</div><div class="fv rc" id="d94">0,00 €</div></div></div>
-              <div class="df full" id="d96wrap" style="display:none"><div class="fn g">96</div><div class="fi"><div class="fl">Campo 96 — para declaração seguinte</div><div class="fv rc" id="d96">0,00 €</div></div></div>
+              <div class="df full" id="d96wrap" style="display:none"><div class="fn g">96</div><div class="fi"><div class="fl">Campo 96 — para declaração seguinte</div><div class="fv rc" id="d96">0,00 €</div></div><button onclick="guardarCampo96()" class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid rgba(45,92,66,.2);white-space:nowrap;margin-left:.5rem;flex-shrink:0" title="Guardar como Campo 96 do próximo trimestre">💾 Guardar p/ próx. trim.</button></div>
             </div>
           </div>
         </div>
@@ -938,15 +938,40 @@ let filterTipo='todos', editingPerfilNif=null;
 // INIT
 // ══════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded',async()=>{
-  const k=localStorage.getItem('fai_key');
-  if(k) document.getElementById('apiKey').value=k;
-  document.getElementById('apiKey').addEventListener('input',e=>localStorage.setItem('fai_key',e.target.value));
+  // Carregar chave API — primeiro localStorage, depois Supabase (sync)
+  const kLocal=localStorage.getItem('fai_key');
+  if(kLocal) document.getElementById('apiKey').value=kLocal;
+  document.getElementById('apiKey').addEventListener('input',e=>{
+    localStorage.setItem('fai_key',e.target.value);
+  });
+  // Sync chave API do Supabase em background
+  setTimeout(async()=>{
+    const kRemote = await sbGetConfigGlobal('api_key','');
+    if(kRemote && !localStorage.getItem('fai_key')){
+      localStorage.setItem('fai_key', kRemote);
+      document.getElementById('apiKey').value = kRemote;
+    }
+  }, 1000);
   const c96=localStorage.getItem('fai_c96');
   if(c96) document.getElementById('campo96').value=c96;
-  document.getElementById('campo96').addEventListener('input',e=>localStorage.setItem('fai_c96',e.target.value));
+  document.getElementById('campo96').addEventListener('input',e=>{
+    localStorage.setItem('fai_c96',e.target.value);
+  });
   const now=new Date();
   document.getElementById('selTrim').value=Math.ceil((now.getMonth()+1)/3);
   document.getElementById('selAno').value=now.getFullYear();
+
+  async function carregarCampo96(){
+    const ano=document.getElementById('selAno').value;
+    const trim=document.getElementById('selTrim').value;
+    const chave='c96_'+ano+'_'+trim;
+    const saved=await sbGetConfig(chave,'');
+    if(saved) document.getElementById('campo96').value=saved;
+    else document.getElementById('campo96').value='';
+    calcular();
+  }
+  document.getElementById('selAno').addEventListener('change', carregarCampo96);
+  document.getElementById('selTrim').addEventListener('change', carregarCampo96);
   await carregarPerfis();
   await loadFaturas();
   calcular();
@@ -2095,13 +2120,14 @@ function abrirSettings(){
   setTimeout(()=>{ if(!saved) document.getElementById('apiKeyModal').focus(); }, 200);
 }
 
-function guardarApiKey(){
+async function guardarApiKey(){
   const k = document.getElementById('apiKeyModal').value.trim();
   if(k){
     localStorage.setItem('fai_key', k);
-    // Sync para o campo escondido na nav
     const navKey = document.getElementById('apiKey');
     if(navKey) navKey.value = k;
+    // Guardar também no Supabase para sync entre dispositivos
+    await sbSetConfigGlobal('api_key', k);
   }
   fecharModal('modalSettings');
   toast('✅ Chave API guardada!', 'success');
@@ -2243,6 +2269,89 @@ function renderDashboard(){
         </div>`).join('')}
     </div>`:'<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:1rem">Sem compras em '+ano+'</div>'}
   `;
+}
+
+
+// ══════════════════════════════════════════════════
+// CONFIGURAÇÕES NO SUPABASE (sync entre dispositivos)
+// ══════════════════════════════════════════════════
+async function sbSetConfig(chave, valor){
+  const nif = perfilAtivo?.nif || 'global';
+  try {
+    await sb.from('configuracoes').upsert(
+      [{perfil_nif: nif, chave, valor: String(valor), updated_at: new Date().toISOString()}],
+      {onConflict: 'perfil_nif,chave'}
+    );
+  } catch(e){ console.warn('sbSetConfig error:', e.message); }
+  // Guardar também localmente como fallback
+  localStorage.setItem('fai_' + chave + '_' + nif, String(valor));
+}
+
+async function sbGetConfig(chave, fallback=''){
+  const nif = perfilAtivo?.nif || 'global';
+  try {
+    const {data} = await sb.from('configuracoes')
+      .select('valor')
+      .eq('perfil_nif', nif)
+      .eq('chave', chave)
+      .single();
+    if(data?.valor !== undefined && data.valor !== null) return data.valor;
+  } catch(e){}
+  // Fallback para localStorage
+  return localStorage.getItem('fai_' + chave + '_' + nif) || fallback;
+}
+
+async function sbGetConfigGlobal(chave, fallback=''){
+  try {
+    const {data} = await sb.from('configuracoes')
+      .select('valor')
+      .eq('perfil_nif', 'global')
+      .eq('chave', chave)
+      .single();
+    if(data?.valor !== undefined && data.valor !== null) return data.valor;
+  } catch(e){}
+  return localStorage.getItem('fai_' + chave) || fallback;
+}
+
+async function sbSetConfigGlobal(chave, valor){
+  try {
+    await sb.from('configuracoes').upsert(
+      [{perfil_nif: 'global', chave, valor: String(valor), updated_at: new Date().toISOString()}],
+      {onConflict: 'perfil_nif,chave'}
+    );
+  } catch(e){ console.warn('sbSetConfigGlobal error:', e.message); }
+  localStorage.setItem('fai_' + chave, String(valor));
+}
+
+
+// ══════════════════════════════════════════════════
+// GUARDAR CAMPO 96 PARA PRÓXIMO TRIMESTRE
+// ══════════════════════════════════════════════════
+async function guardarCampo96(){
+  const el = document.getElementById('d96');
+  const val = el?.textContent || '0,00 €';
+  const num = parseFloat(val.replace(/\./g,'').replace(',','.').replace(/[^0-9.]/g,'')) || 0;
+  if(num <= 0){ toast('⚠️ Sem excesso a reportar','error'); return; }
+
+  const ano = parseInt(document.getElementById('selAno').value);
+  const trim = parseInt(document.getElementById('selTrim').value);
+  let proxAno = ano, proxTrim = trim + 1;
+  if(proxTrim > 4){ proxTrim = 1; proxAno = ano + 1; }
+
+  const nomes = {1:'1º Trim.',2:'2º Trim.',3:'3º Trim.',4:'4º Trim.'};
+  if(!confirm('Guardar ' + val + ' como Campo 96 para o ' + nomes[proxTrim] + ' ' + proxAno + '?')) return;
+
+  showLoader('A guardar Campo 96…');
+  const chave = 'c96_' + proxAno + '_' + proxTrim;
+  await sbSetConfig(chave, num.toFixed(2));
+  hideLoader();
+
+  if(parseInt(document.getElementById('selAno').value)===proxAno &&
+     parseInt(document.getElementById('selTrim').value)===proxTrim){
+    document.getElementById('campo96').value = num.toFixed(2);
+    calcular();
+  }
+  toast('✅ Campo 96 guardado para ' + nomes[proxTrim] + ' ' + proxAno + '!', 'success');
 }
 
 </script>
