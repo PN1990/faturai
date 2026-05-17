@@ -2153,11 +2153,9 @@ INSTRUCAO: Este PDF tem FATURA e NOTA DE CREDITO. Extrai SO a NOTA DE CREDITO (s
 
   return base+`
 
-INSTRUCAO CRITICA: Se o PDF tiver FATURA+NC juntas (como os PDFs da NOS ou MEO que incluem "FACTURA NO." e depois "NOTA CREDITO NO."):
-- Extrai APENAS a FATURA PRINCIPAL - os valores da linha "FACTURA NO." e "TOTAL DA FACTURA"
-- NAO uses os valores da "NOTA CREDITO" no campo principal
-- Coloca "tem_nota_credito":true para que a app faça uma segunda extracao da NC
-- Exemplo correcto para NOS: FACTURA NO.022178709 total=34.00, NOTA CREDITO NO.051536008 total=2.76 → numero_fatura="022178709", total=34.00, tem_nota_credito=true
+Extrai todos os valores da fatura normalmente. Preenche SEMPRE os campos base e IVA com os valores correctos do documento.
+
+CASO ESPECIAL — PDF com FATURA+NC juntas (ex: NOS, MEO): Se o documento tiver explicitamente uma "NOTA CREDITO NO." ou "NOTA DE CREDITO NO." separada da fatura principal, coloca "tem_nota_credito":true e extrai APENAS os valores da fatura principal.
 
 {"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"tem_nota_credito":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}`;
 }
