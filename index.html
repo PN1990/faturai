@@ -2141,10 +2141,25 @@ async function guardarApiKey(){
 function buildPrompt(modo){
   const base=`Analisa este documento fiscal da Regiao Autonoma da Madeira (Portugal).
 Responde APENAS com JSON valido, sem markdown, sem texto extra.
-TAXAS MADEIRA 2025: Reduzida=4%, Intermedia=12%, Normal=22%.
+
+TAXAS IVA MADEIRA 2025: Reduzida=4%, Intermedia=12%, Normal=22%.
+
+INSTRUCOES DE EXTRACAO:
+- Soma TODAS as linhas de base tributavel por taxa. Exemplo: se ha multiplas linhas a 4% soma-as todas em base_5.
+- base_5 = soma de todas as bases a 4% (inclui consumo de agua, energia a taxa reduzida, CAV, etc.)
+- base_22 = soma de todas as bases a 22% (inclui potencia contratada, taxas de exploracao, etc.)
+- base_isenta = valor isento de IVA (saneamento, residuos solidos, etc. marcados como 0% ou isento)
+- iva_5 = soma de todo o IVA a 4%
+- iva_22 = soma de todo o IVA a 22%
+- total = valor total da fatura a pagar
+- NUNCA deixes base_5 ou base_22 a zero se existirem valores no documento
+
 FATURAS ESTRANGEIRAS campo 16: Booking.com, Airbnb, Google, Meta, Microsoft, Adobe.
 Se estrangeira: base_estrangeira=valor sem IVA, iva_estrangeira=22% da base.
-PRESTACOES: amortizacoes de equipamento em linhas_suspeitas. base_22=so servicos.`;
+
+PRESTACOES: amortizacoes de equipamento em linhas_suspeitas. base_22=so servicos.
+
+CASO ESPECIAL — PDF com FATURA+NC juntas (ex: NOS, MEO): Se o documento tiver explicitamente uma "NOTA CREDITO NO." ou "NOTA DE CREDITO NO." separada da fatura principal, coloca "tem_nota_credito":true e extrai APENAS os valores da fatura principal.`;
 
   if(modo==='nc') return base+`
 
@@ -2152,10 +2167,6 @@ INSTRUCAO: Este PDF tem FATURA e NOTA DE CREDITO. Extrai SO a NOTA DE CREDITO (s
 {"tem":true,"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"total":0}`;
 
   return base+`
-
-Extrai todos os valores da fatura normalmente. Preenche SEMPRE os campos base e IVA com os valores correctos do documento.
-
-CASO ESPECIAL — PDF com FATURA+NC juntas (ex: NOS, MEO): Se o documento tiver explicitamente uma "NOTA CREDITO NO." ou "NOTA DE CREDITO NO." separada da fatura principal, coloca "tem_nota_credito":true e extrai APENAS os valores da fatura principal.
 
 {"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"tem_nota_credito":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}`;
 }
