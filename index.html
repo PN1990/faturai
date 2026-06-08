@@ -35,9 +35,6 @@ nav{background:var(--accent);padding:0 1.5rem;display:flex;align-items:center;ju
 .nav-tab:hover{color:rgba(255,255,255,.85)}
 .nav-tab.active{color:#fff;border-bottom:3px solid var(--gold)}
 .nav-right{display:flex;align-items:center;gap:.6rem;flex-shrink:0}
-.api-wrap{display:flex;align-items:center;gap:.35rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.25rem .65rem}
-.api-wrap input{background:none;border:none;outline:none;color:#fff;font-family:'Syne Mono',monospace;font-size:.7rem;width:160px}
-.api-wrap input::placeholder{color:rgba(255,255,255,.3)}
 .db-status{display:flex;align-items:center;gap:.3rem;font-size:.68rem;font-family:'Syne Mono',monospace;color:rgba(255,255,255,.5);white-space:nowrap}
 .db-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.3)}
 .db-dot.ok{background:#5db87a}.db-dot.err{background:#e05c5c}
@@ -251,7 +248,6 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
   .summary-card{position:static}
   nav{padding:0 .75rem}
   .container{padding:1rem}
-  .api-wrap input{width:110px}
   .perfil-bar{padding:.5rem .75rem}
 }
 @media(max-width:600px){
@@ -263,7 +259,6 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
   .nav-center{flex:1;gap:0;justify-content:flex-start;overflow:hidden;min-width:0}
   .nav-tab{padding:0 .4rem;font-size:.6rem;letter-spacing:0;height:50px;white-space:nowrap;flex-shrink:0}
   .nav-right{flex-shrink:0;gap:.25rem;display:flex;align-items:center;min-width:0}
-  .api-wrap{display:none}
   .db-status{display:none}
   .session-badge{padding:.15rem .35rem;flex-shrink:1;min-width:0;max-width:90px}
   .session-name{font-size:.6rem;max-width:55px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -347,7 +342,6 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
 }
 @media(max-width:380px){
   .nav-tab{font-size:.62rem;padding:0 .45rem}
-  .api-wrap{display:none}
   .type-btn{font-size:.66rem;padding:.32rem .4rem}
 }
 </style>
@@ -645,7 +639,6 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
     </div>
     <button id="btnNotif" class="btn btn-sm" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:.3rem .65rem;font-size:.8rem" onclick="toggleNotificacoes()" title="Notificações de prazo">🔔</button>
     <button class="btn btn-sm" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:.3rem .65rem;font-size:.8rem" onclick="abrirSettings()" title="Configurações">⚙️</button>
-    <div class="api-wrap"><span>🔑</span><input type="password" id="apiKey" placeholder="sk-ant-…" /></div>
   </div>
 </nav>
 
@@ -966,7 +959,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
 const SB_URL='https://rfkxxzovukosbosyqhuj.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJma3h4em92dWtvc2Jvc3lxaHVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NTQ3NDMsImV4cCI6MjA4ODIzMDc0M30.PS-3rXHL_qD8Vxon2XbRldWLhLJlEIreHOlEJtON81A';
 const sb=supabase.createClient(SB_URL,SB_KEY);
-const CORES=['#1a3a2a','#7b2d8b','#1a5276','#922b21','#784212','#1a5276','#145a32','#4a235a'];
+const CORES=['#1a3a2a','#7b2d8b','#1a5276','#922b21','#784212','#b9770e','#145a32','#4a235a'];
 
 // ══════════════════════════════════════════════════
 // STATE
@@ -980,20 +973,6 @@ let session=null, dadosCarregados=false;
 // INIT
 // ══════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded',async()=>{
-  // Carregar chave API — primeiro localStorage, depois Supabase (sync)
-  const kLocal=localStorage.getItem('fai_key');
-  if(kLocal) document.getElementById('apiKey').value=kLocal;
-  document.getElementById('apiKey').addEventListener('input',e=>{
-    localStorage.setItem('fai_key',e.target.value);
-  });
-  // Sync chave API do Supabase em background
-  setTimeout(async()=>{
-    const kRemote = await sbGetConfigGlobal('api_key','');
-    if(kRemote && !localStorage.getItem('fai_key')){
-      localStorage.setItem('fai_key', kRemote);
-      document.getElementById('apiKey').value = kRemote;
-    }
-  }, 1000);
   const c96=localStorage.getItem('fai_c96');
   if(c96) document.getElementById('campo96').value=c96;
   document.getElementById('campo96').addEventListener('input',e=>{
@@ -1243,10 +1222,20 @@ function limparFicheiro(e){
   if(btn) btn.style.display='none';
 }
 
+async function chamarIA(content,max_tokens){
+  const{data,error}=await sb.functions.invoke('extract-invoice',{body:{content,max_tokens}});
+  if(error){
+    let msg=error.message||'Erro ao comunicar com a IA';
+    try{ const ctx=await error.context?.json?.(); if(ctx?.error) msg=ctx.error; }catch{}
+    throw new Error(msg);
+  }
+  if(data?.error) throw new Error(data.error);
+  let raw=data.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+  return JSON.parse(raw);
+}
+
 async function extractData(){
-  const apiKey=document.getElementById('apiKey').value.trim();
   const file=fi.files[0];
-  if(!apiKey)return toast('⚠️ Introduz a chave API','error');
   if(!file)return toast('⚠️ Seleciona uma fatura','error');
   if(!perfilAtivo)return toast('⚠️ Seleciona um perfil','error');
   showLoader('A analisar fatura com IA…');
@@ -1259,15 +1248,7 @@ async function extractData(){
 
     const prompt=buildPrompt('fatura');
 
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:[cb,{type:'text',text:prompt}]}]})
-    });
-    if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Erro API')}
-    const data=await resp.json();
-    let raw=data.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
-    const p=JSON.parse(raw);
+    const p=await chamarIA([cb,{type:'text',text:prompt}],1000);
 
     pendingF={
       tipo:tipoAtual,perfil_nif:perfilAtivo.nif,
@@ -1307,16 +1288,8 @@ async function extractData(){
       if(p.tem_nota_credito){
         showLoader('A extrair Nota de Credito...');
         try{
-          const resp2=await fetch('https://api.anthropic.com/v1/messages',{
-            method:'POST',
-            headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-            body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,messages:[{role:'user',content:[cb,{type:'text',text:buildPrompt('nc')}]}]})
-          });
-          if(resp2.ok){
-            const data2=await resp2.json();
-            let raw2=data2.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
-            const nc=JSON.parse(raw2);
-            if(nc.tem!==false){
+          const nc=await chamarIA([cb,{type:'text',text:buildPrompt('nc')}],800);
+          if(nc.tem!==false){
               const fNC={
                 tipo:'nota_credito', perfil_nif:perfilAtivo.nif, nc_tipo:'compra',
                 fornecedor:nc.fornecedor||pendingF.fornecedor,
@@ -1335,7 +1308,6 @@ async function extractData(){
               resetUpload();
               toast('Fatura + Nota de Credito guardadas!','success');
             } else { resetUpload();toast('Fatura guardada!','success'); }
-          }
         }catch(e2){ resetUpload();toast('Fatura guardada (NC: '+e2.message+')','info'); }
         finally{ hideLoader(); }
       } else {
@@ -2053,8 +2025,6 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function startBatch(){
-  const apiKey = document.getElementById('apiKey').value.trim() || localStorage.getItem('fai_key') || '';
-  if(!apiKey){ toast('⚠️ Introduz a chave API','error'); abrirSettings(); return; }
   if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
   if(batchRunning) return;
   batchRunning = true;
@@ -2076,15 +2046,7 @@ async function startBatch(){
       const cb = isPDF
         ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
         :{type:"image",source:{type:"base64",media_type:f.type||'image/jpeg',data:b64}};
-      const resp = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:[cb,{type:'text',text:buildPrompt('fatura')}]}]})
-      });
-      if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Erro API')}
-      const data = await resp.json();
-      let raw = data.content[0].text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```$/,'').trim();
-      const p = JSON.parse(raw);
+      const p = await chamarIA([cb,{type:'text',text:buildPrompt('fatura')}],1000);
       const fatura = {
         tipo:batchTipo, perfil_nif:perfilAtivo.nif,
         nc_tipo:batchTipo==='nota_credito'?'venda':null,
@@ -2206,8 +2168,8 @@ async function guardarManual(){
 // ══════════════════════════════════════════════════
 // CONFIGURAÇÕES
 // ══════════════════════════════════════════════════
-function abrirSettings(){
-  const saved = localStorage.getItem('fai_key') || '';
+async function abrirSettings(){
+  const saved = await sbGetConfigGlobal('api_key','');
   document.getElementById('apiKeyModal').value = saved;
   // Sync estado da BD
   const dot = document.getElementById('dbDotModal');
@@ -2224,10 +2186,6 @@ function abrirSettings(){
 async function guardarApiKey(){
   const k = document.getElementById('apiKeyModal').value.trim();
   if(k){
-    localStorage.setItem('fai_key', k);
-    const navKey = document.getElementById('apiKey');
-    if(navKey) navKey.value = k;
-    // Guardar também no Supabase para sync entre dispositivos
     await sbSetConfigGlobal('api_key', k);
   }
   fecharModal('modalSettings');
