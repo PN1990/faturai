@@ -593,6 +593,32 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
 </div>
 
 <!-- MODAL: EXPORTAR TRIMESTRE -->
+<!-- MODAL: EXPORTAR MODELO 30 -->
+<div class="overlay" id="modalModelo30">
+  <div class="modal" style="width:360px">
+    <div class="modal-hd" style="background:var(--blue)"><div class="modal-title">🌍 Modelo 30 — Mês</div></div>
+    <div class="modal-body" style="padding:1.2rem 1.4rem">
+      <div style="display:flex;gap:.6rem;margin-bottom:.9rem;align-items:center">
+        <label style="font-size:.75rem;color:var(--muted);white-space:nowrap">Ano</label>
+        <select id="m30Ano" style="flex:1;font-size:.82rem;padding:.35rem .6rem;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--text)">
+          <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
+        </select>
+        <label style="font-size:.75rem;color:var(--muted);white-space:nowrap">Mês</label>
+        <select id="m30Mes" style="flex:1.4;font-size:.82rem;padding:.35rem .6rem;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--text)">
+          <option value="01">Janeiro</option><option value="02">Fevereiro</option><option value="03">Março</option>
+          <option value="04">Abril</option><option value="05">Maio</option><option value="06">Junho</option>
+          <option value="07">Julho</option><option value="08">Agosto</option><option value="09">Setembro</option>
+          <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-outline btn-sm" style="flex:1" onclick="fecharModal('modalModelo30')">Cancelar</button>
+        <button class="btn btn-gold" style="flex:2;justify-content:center" onclick="exportModelo30()">⬇ Exportar Excel/CSV</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="modalExportTrim">
   <div class="modal" style="width:360px">
     <div class="modal-hd" style="background:var(--blue)"><div class="modal-title">📊 Exportar Trimestre</div></div>
@@ -784,7 +810,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
           <span id="fatCount" style="font-size:.72rem;color:var(--muted);font-family:'Syne Mono',monospace">—</span>
           <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇ CSV</button>
           <button class="btn btn-outline btn-sm" onclick="abrirExportTrimestre()" title="Exportar faturas de um trimestre para Excel">📊 Trim.</button>
-          <button class="btn btn-outline btn-sm" onclick="exportModelo30()" title="Relatório mensal Booking.com + Airbnb para Modelo 30">🌍 Mod.30</button>
+          <button class="btn btn-outline btn-sm" onclick="abrirModelo30()" title="Relatório mensal Booking.com + Airbnb para Modelo 30">🌍 Mod.30</button>
           <button class="btn btn-outline btn-sm" onclick="exportBackup()" title="Backup completo de todas as faturas">💾 Backup</button>
           <button class="btn btn-outline btn-sm" onclick="abrirImportBackup()">📥 Importar</button>
           <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" onclick="clearAll()">🗑 Limpar</button>
@@ -1827,10 +1853,29 @@ function exportCSVTrimestre(){
   fecharModal('modalExportTrim');
   toast(`⬇ ${list.length} documentos exportados!`,'success');
 }
+function abrirModelo30(){
+  // Pré-selecionar mês atual
+  const hoje = new Date();
+  const mm = String(hoje.getMonth()+1).padStart(2,'0');
+  const ano = String(hoje.getFullYear());
+  const selAno = document.getElementById('m30Ano');
+  const selMes = document.getElementById('m30Mes');
+  if(selAno) selAno.value = ano;
+  if(selMes) selMes.value = mm;
+  document.getElementById('modalModelo30').classList.add('show');
+}
 function exportModelo30(){
   if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
-  // Todas as faturas estrangeiras do perfil ativo
-  const estrang = faturas.filter(f=>f.perfil_nif===perfilAtivo.nif && f.estrangeira && f.tipo!=='nota_credito');
+  const ano = parseInt(document.getElementById('m30Ano').value);
+  const mm  = document.getElementById('m30Mes').value;
+  const nomesMes = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const nomeMes = nomesMes[parseInt(mm)];
+  // Faturas estrangeiras do mês selecionado
+  const estrang = faturas.filter(f=>{
+    if(f.perfil_nif!==perfilAtivo.nif||!f.estrangeira||f.tipo==='nota_credito') return false;
+    const pts=(f.data||'').split('/');
+    return pts.length===3 && parseInt(pts[2])===ano && pts[1].padStart(2,'0')===mm;
+  });
   if(!estrang.length) return toast('⚠️ Sem faturas estrangeiras para este perfil','error');
 
   const identificar = nome => {
@@ -1840,54 +1885,33 @@ function exportModelo30(){
     return nome||'Outro';
   };
 
-  // Agrupar por ano+mês e fornecedor
-  const mapa = {}; // { 'AAAA/MM': { 'Booking.com': {base,iva,n}, ... } }
+  // Agrupar por prestador
+  const mapa = {};
   estrang.forEach(f => {
-    const pts = (f.data||'').split('/');
-    if(pts.length < 3) return;
-    const chave = `${pts[2]}/${pts[1].padStart(2,'0')}`;
     const prest = identificar(f.fornecedor);
-    if(!mapa[chave]) mapa[chave] = {};
-    if(!mapa[chave][prest]) mapa[chave][prest] = {base:0, iva:0, n:0};
-    mapa[chave][prest].base += +f.base_estrangeira||0;
-    mapa[chave][prest].iva  += +f.iva_estrangeira||0;
-    mapa[chave][prest].n++;
+    if(!mapa[prest]) mapa[prest] = {base:0, iva:0, n:0, faturas:[]};
+    mapa[prest].base += +f.base_estrangeira||0;
+    mapa[prest].iva  += +f.iva_estrangeira||0;
+    mapa[prest].n++;
+    mapa[prest].faturas.push(f.numero||'—');
   });
 
-  const prestadores = [...new Set(estrang.map(f=>identificar(f.fornecedor)))].sort();
-  const meses = Object.keys(mapa).sort();
-
-  // Cabeçalho dinâmico
-  const hCols = prestadores.flatMap(p=>[`Base ${p}`,`IVA ${p}`,`Total ${p}`]);
-  const h = ['Mês', ...hCols, 'Total Geral'];
-  const rows = meses.map(mes => {
-    let totalGeral = 0;
-    const cols = prestadores.flatMap(p => {
-      const d = mapa[mes]?.[p] || {base:0, iva:0};
-      const total = +(d.base+d.iva).toFixed(2);
-      totalGeral += total;
-      return [d.base.toFixed(2), d.iva.toFixed(2), total.toFixed(2)];
-    });
-    const [ano, mm] = mes.split('/');
-    const nomeMes = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mm)];
-    return [`${nomeMes} ${ano}`, ...cols, totalGeral.toFixed(2)];
-  });
-
-  // Linha de totais
-  const totais = prestadores.flatMap(p => {
-    const base = estrang.filter(f=>identificar(f.fornecedor)===p).reduce((s,f)=>s+(+f.base_estrangeira||0),0);
-    const iva  = estrang.filter(f=>identificar(f.fornecedor)===p).reduce((s,f)=>s+(+f.iva_estrangeira||0),0);
-    return [base.toFixed(2), iva.toFixed(2), (base+iva).toFixed(2)];
-  });
-  const totalGeralFinal = estrang.reduce((s,f)=>s+(+f.base_estrangeira||0)+(+f.iva_estrangeira||0),0);
-  rows.push(['TOTAL', ...totais, totalGeralFinal.toFixed(2)]);
+  const h = ['Prestador','Nº Faturas','Números','Base (€)','IVA 22% (€)','Total (€)'];
+  const rows = Object.entries(mapa).sort(([a],[b])=>a.localeCompare(b)).map(([prest,d])=>[
+    prest, d.n, d.faturas.join(' | '),
+    d.base.toFixed(2), d.iva.toFixed(2), (d.base+d.iva).toFixed(2)
+  ]);
+  const totalBase = estrang.reduce((s,f)=>s+(+f.base_estrangeira||0),0);
+  const totalIva  = estrang.reduce((s,f)=>s+(+f.iva_estrangeira||0),0);
+  rows.push(['TOTAL', estrang.length, '', totalBase.toFixed(2), totalIva.toFixed(2), (totalBase+totalIva).toFixed(2)]);
 
   const csv = '﻿' + h.join(';') + '\n' + rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download = `Modelo30_${perfilAtivo.nif}.csv`;
+  a.download = `Modelo30_${ano}_${mm}_${nomeMes}_${perfilAtivo.nif}.csv`;
   a.click();
-  toast(`🌍 Modelo 30 exportado — ${meses.length} meses, ${estrang.length} faturas`, 'success');
+  fecharModal('modalModelo30');
+  toast(`🌍 Modelo 30 ${nomeMes} ${ano} — ${estrang.length} fatura(s) exportada(s)`, 'success');
 }
 // ══════════════════════════════════════════════════
 // BACKUP COMPLETO
