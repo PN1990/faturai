@@ -2073,9 +2073,32 @@ async function startBatch(){
       } else {
         await guardarF(fatura, true); // skipDupCheck=true porque já verificámos
         done++;
+        let stText = fatura.fornecedor !== '—' ? fatura.fornecedor : 'Guardada';
+        // NC embebida no mesmo PDF (ex: NOS)
+        if(p.tem_nota_credito && batchTipo !== 'nota_credito'){
+          try{
+            const nc = await chamarIA([cb,{type:'text',text:buildPrompt('nc')}], 800);
+            if(nc.tem !== false){
+              const fNC={
+                tipo:'nota_credito', perfil_nif:perfilAtivo.nif, nc_tipo:'compra',
+                fornecedor:nc.fornecedor||fatura.fornecedor, nif:nc.nif_fornecedor||fatura.nif,
+                numero:nc.numero_fatura||'--', data:nc.data||fatura.data,
+                isenta:false, estrangeira:false, pais_origem:null,
+                base_5:+nc.base_5||0, iva_5:+nc.iva_5||0,
+                base_12:+nc.base_12||0, iva_12:+nc.iva_12||0,
+                base_22:+nc.base_22||0, iva_22:+nc.iva_22||0,
+                base_isenta:+nc.base_isenta||0, base_estrangeira:0, iva_estrangeira:0,
+                total:+nc.total||0, prestacoes:0, nota:null, ficheiro:f.name
+              };
+              recalcTotais(fNC);
+              await guardarF(fNC, true);
+              stText += ' + NC';
+            }
+          }catch(e2){ /* NC falhou silenciosamente, fatura principal já guardada */ }
+        }
         row.className='qrow done';
         ico.textContent='✅';
-        st.textContent=fatura.fornecedor !== '—' ? fatura.fornecedor : 'Guardada';
+        st.textContent=stText;
       }
     } catch(e) {
       errors++;
@@ -2210,15 +2233,18 @@ INSTRUCOES DE EXTRACAO:
 - base_isenta = valor isento de IVA (saneamento, residuos solidos, etc. marcados como 0% ou isento)
 - iva_5 = soma de todo o IVA a 4%
 - iva_22 = soma de todo o IVA a 22%
-- total = valor total da fatura a pagar
+- total = base tributavel + IVA dos servicos da fatura atual. NAO incluas prestacoes/amortizacoes de equipamento de periodos anteriores (ex: MEO/NOS cobram prestacao de equipamento separada dos servicos — ignora esse valor no total)
 - NUNCA deixes base_5 ou base_22 a zero se existirem valores no documento
+
+PRESTACOES DE EQUIPAMENTO (MEO, NOS, etc.): Quando a fatura tem uma linha de "prestacao de equipamento" ou "amortizacao":
+  - NAO incluas esse valor na base_22 nem no total
+  - Coloca "tem_prestacoes":true e coloca a linha em linhas_suspeitas
+  - base_22 = apenas servicos de telecomunicacoes/internet/TV
 
 FATURAS ESTRANGEIRAS campo 16: Booking.com, Airbnb, Google, Meta, Microsoft, Adobe.
 Se estrangeira: base_estrangeira=valor sem IVA, iva_estrangeira=22% da base.
 
-PRESTACOES: amortizacoes de equipamento em linhas_suspeitas. base_22=so servicos.
-
-CASO ESPECIAL — PDF com FATURA+NC juntas (ex: NOS, MEO): Se o documento tiver explicitamente uma "NOTA CREDITO NO." ou "NOTA DE CREDITO NO." separada da fatura principal, coloca "tem_nota_credito":true e extrai APENAS os valores da fatura principal.`;
+CASO ESPECIAL — PDF com FATURA+NC juntas (ex: NOS, MEO): Se o documento contiver uma secao separada "NOTA CREDITO NO." ou "NOTA DE CREDITO NO.", coloca "tem_nota_credito":true e extrai APENAS os valores da fatura principal (ignora completamente os valores da NC nesta passagem).`;
 
   if(modo==='nc') return base+`
 
