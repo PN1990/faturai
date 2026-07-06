@@ -784,6 +784,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
           <span id="fatCount" style="font-size:.72rem;color:var(--muted);font-family:'Syne Mono',monospace">—</span>
           <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇ CSV</button>
           <button class="btn btn-outline btn-sm" onclick="abrirExportTrimestre()" title="Exportar faturas de um trimestre para Excel">📊 Trim.</button>
+          <button class="btn btn-outline btn-sm" onclick="exportModelo30()" title="Relatório mensal Booking.com + Airbnb para Modelo 30">🌍 Mod.30</button>
           <button class="btn btn-outline btn-sm" onclick="exportBackup()" title="Backup completo de todas as faturas">💾 Backup</button>
           <button class="btn btn-outline btn-sm" onclick="abrirImportBackup()">📥 Importar</button>
           <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" onclick="clearAll()">🗑 Limpar</button>
@@ -1466,8 +1467,18 @@ async function uploadToStorage(file, fatura){
     const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     const path=`${fatura.perfil_nif}/${yy}/${q}/M${mm.padStart(2,'0')}/${slug}/${Date.now()}_${safeName}`;
     const{error}=await sb.storage.from('faturas-docs').upload(path,file,{upsert:true,contentType:file.type||'application/pdf'});
-    if(error&&error.message!=='The resource already exists')console.warn('Storage upload:',error.message);
+    if(error&&error.message!=='The resource already exists'){console.warn('Storage upload:',error.message);return;}
+    // Guardar caminho na BD para download posterior
+    if(fatura.id) await sb.from('faturas').update({storage_path:path}).eq('id',fatura.id);
   }catch(e){console.warn('Storage:',e.message);}
+}
+async function downloadFaturaDoc(id, path){
+  if(!path){toast('⚠️ Ficheiro não disponível — foi extraído antes de esta funcionalidade existir','error');return;}
+  try{
+    const{data,error}=await sb.storage.from('faturas-docs').createSignedUrl(path,60);
+    if(error)throw error;
+    window.open(data.signedUrl,'_blank');
+  }catch(e){toast('❌ Erro ao obter ficheiro: '+e.message,'error');}
 }
 async function guardarF(f, skipDupCheck=false){
   recalcTotais(f);
@@ -1567,6 +1578,7 @@ function renderFaturas(){
     <td class="mono">${(f.prestacoes||0)>0?'<span style="color:var(--gold);font-weight:700">'+fmt(f.prestacoes)+'</span>':'<span style="color:var(--muted)">—</span>'}</td>
     <td class="mono"><strong>${fmt(f.total)}</strong></td>
     <td style="white-space:nowrap">
+      ${f.storage_path?`<button class="btn btn-sm" style="background:rgba(52,152,219,.12);color:var(--blue);border:none;margin-right:.2rem" title="Descarregar ficheiro original" onclick="downloadFaturaDoc(${f.id},${JSON.stringify(f.storage_path)})">📎</button>`:''}
       <button class="btn btn-sm" style="background:var(--gold-light);color:var(--gold);border:none;margin-right:.2rem" onclick="abrirEdicao(${f.id})">✏️</button>
       <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none" onclick="delFatura(${f.id})">✕</button>
     </td>
@@ -1814,6 +1826,68 @@ function exportCSVTrimestre(){
   a.click();
   fecharModal('modalExportTrim');
   toast(`⬇ ${list.length} documentos exportados!`,'success');
+}
+function exportModelo30(){
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  // Todas as faturas estrangeiras do perfil ativo
+  const estrang = faturas.filter(f=>f.perfil_nif===perfilAtivo.nif && f.estrangeira && f.tipo!=='nota_credito');
+  if(!estrang.length) return toast('⚠️ Sem faturas estrangeiras para este perfil','error');
+
+  const identificar = nome => {
+    const n = (nome||'').toLowerCase();
+    if(n.includes('booking')) return 'Booking.com';
+    if(n.includes('airbnb')) return 'Airbnb';
+    return nome||'Outro';
+  };
+
+  // Agrupar por ano+mês e fornecedor
+  const mapa = {}; // { 'AAAA/MM': { 'Booking.com': {base,iva,n}, ... } }
+  estrang.forEach(f => {
+    const pts = (f.data||'').split('/');
+    if(pts.length < 3) return;
+    const chave = `${pts[2]}/${pts[1].padStart(2,'0')}`;
+    const prest = identificar(f.fornecedor);
+    if(!mapa[chave]) mapa[chave] = {};
+    if(!mapa[chave][prest]) mapa[chave][prest] = {base:0, iva:0, n:0};
+    mapa[chave][prest].base += +f.base_estrangeira||0;
+    mapa[chave][prest].iva  += +f.iva_estrangeira||0;
+    mapa[chave][prest].n++;
+  });
+
+  const prestadores = [...new Set(estrang.map(f=>identificar(f.fornecedor)))].sort();
+  const meses = Object.keys(mapa).sort();
+
+  // Cabeçalho dinâmico
+  const hCols = prestadores.flatMap(p=>[`Base ${p}`,`IVA ${p}`,`Total ${p}`]);
+  const h = ['Mês', ...hCols, 'Total Geral'];
+  const rows = meses.map(mes => {
+    let totalGeral = 0;
+    const cols = prestadores.flatMap(p => {
+      const d = mapa[mes]?.[p] || {base:0, iva:0};
+      const total = +(d.base+d.iva).toFixed(2);
+      totalGeral += total;
+      return [d.base.toFixed(2), d.iva.toFixed(2), total.toFixed(2)];
+    });
+    const [ano, mm] = mes.split('/');
+    const nomeMes = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(mm)];
+    return [`${nomeMes} ${ano}`, ...cols, totalGeral.toFixed(2)];
+  });
+
+  // Linha de totais
+  const totais = prestadores.flatMap(p => {
+    const base = estrang.filter(f=>identificar(f.fornecedor)===p).reduce((s,f)=>s+(+f.base_estrangeira||0),0);
+    const iva  = estrang.filter(f=>identificar(f.fornecedor)===p).reduce((s,f)=>s+(+f.iva_estrangeira||0),0);
+    return [base.toFixed(2), iva.toFixed(2), (base+iva).toFixed(2)];
+  });
+  const totalGeralFinal = estrang.reduce((s,f)=>s+(+f.base_estrangeira||0)+(+f.iva_estrangeira||0),0);
+  rows.push(['TOTAL', ...totais, totalGeralFinal.toFixed(2)]);
+
+  const csv = '﻿' + h.join(';') + '\n' + rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download = `Modelo30_${perfilAtivo.nif}.csv`;
+  a.click();
+  toast(`🌍 Modelo 30 exportado — ${meses.length} meses, ${estrang.length} faturas`, 'success');
 }
 // ══════════════════════════════════════════════════
 // BACKUP COMPLETO
