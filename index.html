@@ -592,6 +592,29 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
   </div>
 </div>
 
+<!-- MODAL: EXPORTAR TRIMESTRE -->
+<div class="overlay" id="modalExportTrim">
+  <div class="modal" style="width:360px">
+    <div class="modal-hd" style="background:var(--blue)"><div class="modal-title">📊 Exportar Trimestre</div></div>
+    <div class="modal-body" style="padding:1.2rem 1.4rem">
+      <div style="display:flex;gap:.6rem;margin-bottom:.9rem;align-items:center">
+        <label style="font-size:.75rem;color:var(--muted);white-space:nowrap">Ano</label>
+        <select id="etAno" style="flex:1;font-size:.82rem;padding:.35rem .6rem;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--text)">
+          <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
+        </select>
+        <label style="font-size:.75rem;color:var(--muted);white-space:nowrap">Trimestre</label>
+        <select id="etTrim" style="flex:1;font-size:.82rem;padding:.35rem .6rem;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--text)">
+          <option value="1">1º (Jan-Mar)</option><option value="2">2º (Abr-Jun)</option><option value="3">3º (Jul-Set)</option><option value="4">4º (Out-Dez)</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-outline btn-sm" style="flex:1" onclick="fecharModal('modalExportTrim')">Cancelar</button>
+        <button class="btn btn-gold" style="flex:2;justify-content:center" onclick="exportCSVTrimestre()">⬇ Exportar Excel/CSV</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: NOTA DE CRÉDITO -->
 <div class="overlay" id="modalNC">
   <div class="modal" style="width:440px">
@@ -760,6 +783,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <div class="abar">
           <span id="fatCount" style="font-size:.72rem;color:var(--muted);font-family:'Syne Mono',monospace">—</span>
           <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇ CSV</button>
+          <button class="btn btn-outline btn-sm" onclick="abrirExportTrimestre()" title="Exportar faturas de um trimestre para Excel">📊 Trim.</button>
           <button class="btn btn-outline btn-sm" onclick="exportBackup()" title="Backup completo de todas as faturas">💾 Backup</button>
           <button class="btn btn-outline btn-sm" onclick="abrirImportBackup()">📥 Importar</button>
           <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" onclick="clearAll()">🗑 Limpar</button>
@@ -966,6 +990,7 @@ const CORES=['#1a3a2a','#7b2d8b','#1a5276','#922b21','#784212','#b9770e','#145a3
 // ══════════════════════════════════════════════════
 let faturas=[], perfis=[], perfilAtivo=null;
 let tipoAtual='venda', pendingF=null, pendingLinhas=[], editingId=null;
+let pendingUploadFile=null; // ficheiro aguardando upload após guardarF
 let filterTipo='todos', editingPerfilNif=null;
 let session=null, dadosCarregados=false;
 
@@ -1266,7 +1291,13 @@ async function extractData(){
     };
     recalcTotais(pendingF);
     pendingLinhas=p.linhas_suspeitas||[];
+    pendingUploadFile=file; // para upload ao Supabase Storage quando guardarF correr
     hideLoader();
+
+    // Aviso NIF cliente divergente
+    if(p.nif_cliente && perfilAtivo.nif && p.nif_cliente !== perfilAtivo.nif){
+      toast(`⚠️ NIF da fatura (${p.nif_cliente}) não corresponde ao perfil ativo (${perfilAtivo.nif}) — verifica se escolheste o perfil certo!`,'error');
+    }
 
     // If NC, ask which side it affects before proceeding
     if(tipoAtual==='nota_credito'){
@@ -1425,6 +1456,19 @@ function recalcTotais(f){
   f.base_total=(+f.base_5||0)+(+f.base_12||0)+(+f.base_22||0)+(+f.base_isenta||0);
   f.iva_total=(+f.iva_5||0)+(+f.iva_12||0)+(+f.iva_22||0);
 }
+async function uploadToStorage(file, fatura){
+  try{
+    const pts=(fatura.data||'').split('/');
+    if(pts.length<3)return;
+    const [dd,mm,yy]=pts;
+    const q='Q'+Math.ceil(parseInt(mm)/3);
+    const slug=(fatura.fornecedor||'outro').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').substring(0,30);
+    const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const path=`${fatura.perfil_nif}/${yy}/${q}/M${mm.padStart(2,'0')}/${slug}/${Date.now()}_${safeName}`;
+    const{error}=await sb.storage.from('faturas-docs').upload(path,file,{upsert:true,contentType:file.type||'application/pdf'});
+    if(error&&error.message!=='The resource already exists')console.warn('Storage upload:',error.message);
+  }catch(e){console.warn('Storage:',e.message);}
+}
 async function guardarF(f, skipDupCheck=false){
   recalcTotais(f);
   if(!skipDupCheck){
@@ -1435,6 +1479,7 @@ async function guardarF(f, skipDupCheck=false){
     const saved=await sbInsert(f);
     faturas.unshift(saved);
     renderFaturas();calcular();
+    if(pendingUploadFile){const fl=pendingUploadFile;pendingUploadFile=null;uploadToStorage(fl,saved);}
   }catch(e){
     if(e.message==='DUPLICATE'&&e.dupData){
       mostrarAvisoDup(e.dupData, ()=>guardarF(f, true));
@@ -1727,6 +1772,48 @@ function exportCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
   a.download='faturas_'+perfilAtivo?.nif+'.csv';a.click();
   toast('⬇ CSV exportado!','success');
+}
+function abrirExportTrimestre(){
+  // Pré-seleccionar o trimestre da declaração activa
+  const ano=document.getElementById('selAno')?.value;
+  const trim=document.getElementById('selTrim')?.value;
+  if(ano) document.getElementById('etAno').value=ano;
+  if(trim) document.getElementById('etTrim').value=trim;
+  document.getElementById('modalExportTrim').classList.add('show');
+}
+function exportCSVTrimestre(){
+  const ano=parseInt(document.getElementById('etAno').value);
+  const trim=parseInt(document.getElementById('etTrim').value);
+  const meses={1:[1,2,3],2:[4,5,6],3:[7,8,9],4:[10,11,12]};
+  const nomesTrim={1:'Q1_Jan-Mar',2:'Q2_Abr-Jun',3:'Q3_Jul-Set',4:'Q4_Out-Dez'};
+  if(!perfilAtivo)return toast('⚠️ Seleciona um perfil','error');
+  const list=faturas.filter(f=>{
+    if(f.perfil_nif!==perfilAtivo.nif)return false;
+    if(!f.data||f.data==='—')return false;
+    const pts=f.data.split('/');if(pts.length<3)return false;
+    return parseInt(pts[2])===ano&&meses[trim]?.includes(parseInt(pts[1]));
+  }).sort((a,b)=>{
+    const da=a.data?.split('/').reverse().join('')||'';
+    const db=b.data?.split('/').reverse().join('')||'';
+    return da.localeCompare(db);
+  });
+  if(!list.length){fecharModal('modalExportTrim');return toast('⚠️ Sem faturas neste trimestre','error');}
+  const tipoLabel={venda:'Venda',compra:'Compra',nota_credito:'Nota Crédito'};
+  const h=['Tipo','NC_Lado','Fornecedor','NIF_Fornecedor','Numero','Data','Base_4%','IVA_4%','Base_12%','IVA_12%','Base_22%','IVA_22%','Base_Isenta','Base_Estrang','IVA_Estrang','IVA_Total','Total','Ficheiro'];
+  const rows=list.map(f=>[
+    tipoLabel[f.tipo]||f.tipo, f.nc_tipo||'',
+    f.fornecedor,f.nif,f.numero,f.data,
+    f.base_5,f.iva_5,f.base_12,f.iva_12,f.base_22,f.iva_22,
+    f.base_isenta,f.base_estrangeira,f.iva_estrangeira,
+    f.iva_total,f.total,f.ficheiro
+  ].map(v=>`"${String(v??'').replace(/"/g,'""')}"`));
+  const csv='﻿'+h.join(';')+'\n'+rows.map(r=>r.join(';')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=`IVA_${ano}_${nomesTrim[trim]}_${perfilAtivo.nif}.csv`;
+  a.click();
+  fecharModal('modalExportTrim');
+  toast(`⬇ ${list.length} documentos exportados!`,'success');
 }
 // ══════════════════════════════════════════════════
 // BACKUP COMPLETO
@@ -2071,6 +2158,7 @@ async function startBatch(){
         st.innerHTML='Já existe &nbsp;<button onclick="guardarFaturaBatch(this,'+JSON.stringify(fatura)+')" style="font-size:.65rem;padding:.15rem .45rem;background:var(--gold);color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:Syne,sans-serif;font-weight:700">Guardar mesmo assim</button>';
         ignoradas++;
       } else {
+        pendingUploadFile=f;
         await guardarF(fatura, true); // skipDupCheck=true porque já verificámos
         done++;
         let stText = fatura.fornecedor !== '—' ? fatura.fornecedor : 'Guardada';
@@ -2091,6 +2179,7 @@ async function startBatch(){
                 total:+nc.total||0, prestacoes:0, nota:null, ficheiro:f.name
               };
               recalcTotais(fNC);
+              pendingUploadFile=f;
               await guardarF(fNC, true);
               stText += ' + NC';
             }
@@ -2253,7 +2342,9 @@ INSTRUCAO: Este PDF tem FATURA e NOTA DE CREDITO. Extrai SO a NOTA DE CREDITO (s
 
   return base+`
 
-{"fornecedor":"","nif_fornecedor":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"tem_nota_credito":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}`;
+{"fornecedor":"","nif_fornecedor":null,"nif_cliente":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"tem_nota_credito":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}
+
+Nota: nif_cliente = NIF do DESTINATARIO/CLIENTE da fatura (o que recebe a fatura, nao o fornecedor). Deixa null se nao estiver visivel.`;
 }
 
 
