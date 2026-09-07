@@ -1315,6 +1315,11 @@ async function extractData(){
       tipoAtual='nota_credito';
       setType('nota_credito');
     }
+    // Auto-deteta Compra: se o nif_cliente corresponde ao perfil ativo, é uma fatura recebida
+    if(tipoAtual!=='nota_credito' && p.nif_cliente && perfilAtivo.nif && p.nif_cliente===perfilAtivo.nif && tipoAtual!=='compra'){
+      tipoAtual='compra';
+      setType('compra');
+    }
 
     pendingF={
       tipo:tipoAtual,perfil_nif:perfilAtivo.nif,
