@@ -809,12 +809,19 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <span class="card-title">📋 Faturas Guardadas</span>
         <div class="abar">
           <span id="fatCount" style="font-size:.72rem;color:var(--muted);font-family:'Syne Mono',monospace">—</span>
-          <button class="btn btn-outline btn-sm" onclick="exportCSV()">⬇ CSV</button>
-          <button class="btn btn-outline btn-sm" onclick="abrirExportTrimestre()" title="Exportar faturas de um trimestre para Excel">📊 Trim.</button>
-          <button class="btn btn-outline btn-sm" onclick="abrirModelo30()" title="Relatório mensal Booking.com + Airbnb para Modelo 30">🌍 Mod.30</button>
-          <button class="btn btn-outline btn-sm" onclick="exportBackup()" title="Backup completo de todas as faturas">💾 Backup</button>
-          <button class="btn btn-outline btn-sm" onclick="abrirImportBackup()">📥 Importar</button>
-          <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" onclick="clearAll()">🗑 Limpar</button>
+          <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+            <span style="font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Exportar</span>
+            <button class="btn btn-outline btn-sm" onclick="exportCSV()" title="Exportar todas as faturas em CSV">⬇ CSV</button>
+            <button class="btn btn-outline btn-sm" onclick="abrirExportTrimestre()" title="Exportar faturas de um trimestre para e-Fatura">📊 Trimestre</button>
+            <button class="btn btn-sm" style="background:rgba(39,174,96,.1);color:#27ae60;border:1px solid rgba(39,174,96,.35);font-size:.72rem" onclick="abrirModelo30()" title="Relatório mensal Booking/Airbnb — gera CSV e XML para Portal AT">🌍 Modelo 30 AT</button>
+          </div>
+          <div style="width:1px;height:1.4rem;background:var(--border);flex-shrink:0;opacity:.5"></div>
+          <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+            <span style="font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Gerir</span>
+            <button class="btn btn-outline btn-sm" onclick="exportBackup()" title="Backup completo de todas as faturas">💾 Backup</button>
+            <button class="btn btn-outline btn-sm" onclick="abrirImportBackup()">📥 Importar</button>
+            <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" onclick="clearAll()">🗑 Limpar</button>
+          </div>
         </div>
       </div>
       <!-- FILTROS -->
