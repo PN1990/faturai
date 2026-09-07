@@ -711,61 +711,24 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
       <div class="card-body">
         <!-- TABS -->
         <div class="upload-tabs">
-          <button class="upload-tab active" onclick="showUploadTab('ia',this)">✦ IA — Uma fatura</button>
-          <button class="upload-tab" onclick="showUploadTab('batch',this)">📦 IA — Várias faturas</button>
+          <button class="upload-tab active" onclick="showUploadTab('batch',this)">✦ IA</button>
           <button class="upload-tab" onclick="showUploadTab('manual',this)">✏️ Manual</button>
         </div>
 
-        <!-- PANE: IA SINGLE -->
-        <div class="upload-pane active" id="pane-ia">
-          <div class="upload-layout">
-            <div>
-              <div class="type-toggle">
-                <button class="type-btn av" id="btnV" onclick="setType('venda')">📤 Venda</button>
-                <button class="type-btn" id="btnC" onclick="setType('compra')">📥 Compra</button>
-                <button class="type-btn" id="btnN" onclick="setType('nota_credito')">↩️ N. Crédito</button>
-              </div>
-              <div class="drop-zone" id="dropZone" style="position:relative">
-                <input type="file" id="fileInput" accept="image/*,.pdf" />
-                <div class="drop-icon" id="dropIcon">📂</div>
-                <div class="drop-label" id="dropLabel">Arrasta ou clica para selecionar</div>
-                <div class="drop-sub">PNG · JPG · WEBP · PDF</div>
-                <img id="prevImg" class="preview-img" style="display:none" />
-                <button id="btnClearFile" onclick="limparFicheiro(event)" style="display:none;position:absolute;top:.4rem;right:.4rem;background:var(--danger);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:.75rem;cursor:pointer;line-height:1;z-index:2" title="Remover ficheiro">✕</button>
-              </div>
-              <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" />
-              <button class="btn btn-outline" id="btnCamera" onclick="document.getElementById('cameraInput').click()" style="width:100%;margin-top:.5rem;display:none">
-                📷 Tirar foto com a câmara
-              </button>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:.85rem;justify-content:flex-end">
-              <div class="info-box green" style="margin-bottom:0">
-                <strong>ℹ️ Extração IA — Madeira 2025</strong><br>
-                Taxas: <strong>4%</strong> · <strong>12%</strong> · <strong>22%</strong><br>
-                Deteta prestações MEO/NOS<br>
-                Deteta faturas estrangeiras → Campo 16
-              </div>
-              <button class="btn btn-primary" onclick="extractData()">✦ Extrair com IA</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- PANE: BATCH -->
-        <div class="upload-pane" id="pane-batch">
-          <div class="type-toggle" style="margin-bottom:.85rem">
-            <button class="type-btn av" id="batchBtnV" onclick="setBatchType('venda')">📤 Venda</button>
-            <button class="type-btn" id="batchBtnC" onclick="setBatchType('compra')">📥 Compra</button>
-            <button class="type-btn" id="batchBtnN" onclick="setBatchType('nota_credito')">↩️ N. Crédito</button>
+        <!-- PANE: IA -->
+        <div class="upload-pane active" id="pane-batch">
+          <div class="info-box green" style="margin-bottom:.85rem;font-size:.74rem">
+            <strong>ℹ️ Extração IA — Madeira 2025</strong> · Taxas: <strong>4%</strong> · <strong>12%</strong> · <strong>22%</strong> · Deteta MEO/NOS · Estrangeiras · Tipo automático
           </div>
           <div class="drop-zone" id="batchDropZone" style="min-height:110px">
             <input type="file" id="batchFileInput" accept="image/*,.pdf" multiple />
             <div class="drop-icon">📂</div>
-            <div class="drop-label">Arrasta vários ficheiros aqui</div>
-            <div class="drop-sub">Podes selecionar múltiplos PDFs / imagens de uma vez</div>
+            <div class="drop-label">Arrasta ou clica — 1 ou vários ficheiros</div>
+            <div class="drop-sub">PNG · JPG · WEBP · PDF</div>
           </div>
           <input type="file" id="batchCameraInput" accept="image/*" capture="environment" style="display:none" />
           <button class="btn btn-outline" id="btnBatchCamera" onclick="document.getElementById('batchCameraInput').click()" style="width:100%;margin-top:.5rem;display:none">
-            📷 Fotografar fatura
+            📷 Tirar foto com a câmara
           </button>
           <div id="batchQueueWrap" style="display:none;margin-top:.85rem">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
@@ -773,7 +736,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
               <div class="progress-bar-wrap" style="flex:1;margin:0 .85rem"><div class="progress-bar" id="batchBar" style="width:0%"></div></div>
             </div>
             <div class="queue-wrap" id="batchQueue"></div>
-            <button class="btn btn-primary" id="btnStartBatch" onclick="startBatch()">✦ Processar todas com IA</button>
+            <button class="btn btn-primary" id="btnStartBatch" onclick="startBatch()">✦ Extrair com IA</button>
           </div>
         </div>
 
@@ -1258,29 +1221,6 @@ function setType(t){
 // ══════════════════════════════════════════════════
 // FILE / EXTRACT
 // ══════════════════════════════════════════════════
-const dz=document.getElementById('dropZone'),fi=document.getElementById('fileInput');
-dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover')});
-dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])});
-fi.addEventListener('change',()=>{if(fi.files[0])handleFile(fi.files[0])});
-function handleFile(f){
-  document.getElementById('dropLabel').textContent=f.name;
-  document.getElementById('dropIcon').textContent='✅';
-  if(f.type.startsWith('image/')){const r=new FileReader();r.onload=e=>{const i=document.getElementById('prevImg');i.src=e.target.result;i.style.display='block'};r.readAsDataURL(f)}
-  else document.getElementById('prevImg').style.display='none';
-  const btn=document.getElementById('btnClearFile');
-  if(btn) btn.style.display='';
-}
-
-function limparFicheiro(e){
-  e.preventDefault();e.stopPropagation();
-  document.getElementById('fileInput').value='';
-  document.getElementById('dropIcon').textContent='📂';
-  document.getElementById('dropLabel').textContent='Arrasta ou clica para selecionar';
-  document.getElementById('prevImg').style.display='none';
-  const btn=document.getElementById('btnClearFile');
-  if(btn) btn.style.display='none';
-}
 
 async function chamarIA(content,max_tokens){
   const{data,error}=await sb.functions.invoke('extract-invoice',{body:{content,max_tokens}});
@@ -1400,6 +1340,8 @@ async function extractData(){
 function fecharModal(id){document.getElementById(id).classList.remove('show')}
 function tratarComoNormal(){
   pendingF.estrangeira=false;pendingF.base_estrangeira=0;pendingF.iva_estrangeira=0;
+  fecharModal('modalEstrang');
+  if(modalResolver){const r=modalResolver;modalResolver=null;r();return;}
   if(pendingLinhas.length>0)abrirPrest();
   else guardarF(pendingF).then(()=>{resetUpload();toast('✅ Fatura guardada!','success')});
 }
@@ -1408,6 +1350,7 @@ async function confirmarEstrang(){
   pendingF.iva_estrangeira=parseFloat(document.getElementById('estIva').value)||0;
   pendingF.estrangeira=true;
   fecharModal('modalEstrang');
+  if(modalResolver){const r=modalResolver;modalResolver=null;r();return;}
   if(pendingLinhas.length>0)abrirPrest();
   else{await guardarF(pendingF);resetUpload();toast('✅ Fatura estrangeira guardada! (Campo 16)','success');}
 }
@@ -1450,6 +1393,7 @@ async function confirmarPrest(){
   pendingF.prestacoes=prestTotal;
   recalcTotais(pendingF);
   fecharModal('modalPrest');
+  if(modalResolver){const r=modalResolver;modalResolver=null;r();return;}
   showLoader('A guardar…');
   try{await guardarF(pendingF);resetUpload();toast('✅ Fatura guardada (prestações excluídas)!','success')}
   catch(e){toast('❌ '+e.message,'error')}
@@ -1543,10 +1487,6 @@ async function guardarF(f, skipDupCheck=false){
   }
 }
 function resetUpload(){
-  fi.value='';
-  document.getElementById('dropIcon').textContent='📂';
-  document.getElementById('dropLabel').textContent='Arrasta ou clica para selecionar';
-  document.getElementById('prevImg').style.display='none';
   pendingF=null;pendingLinhas=[];
 }
 
@@ -2058,7 +1998,7 @@ function selNCTipo(tipo){
 async function confirmarNC(){
   pendingF.nc_tipo=selectedNCTipo;
   fecharModal('modalNC');
-  // NC never has prestacoes or estrangeira flow — just save
+  if(modalResolver){const r=modalResolver;modalResolver=null;r();return;}
   showLoader('A guardar nota de crédito…');
   try{
     await guardarF(pendingF);
@@ -2238,16 +2178,9 @@ async function continuarAposVerificacao(){
 // ══════════════════════════════════════════════════
 // BATCH PROCESSING
 // ══════════════════════════════════════════════════
-let batchTipo = 'venda';
 let batchFiles = [];
 let batchRunning = false;
-
-function setBatchType(t){
-  batchTipo=t;
-  document.getElementById('batchBtnV').className='type-btn '+(t==='venda'?'av':'');
-  document.getElementById('batchBtnC').className='type-btn '+(t==='compra'?'ac':'');
-  document.getElementById('batchBtnN').className='type-btn '+(t==='nota_credito'?'an':'');
-}
+let modalResolver = null;
 
 function loadBatchFiles(files){
   batchFiles = Array.from(files);
@@ -2315,16 +2248,21 @@ async function startBatch(){
     st.textContent='A processar…';
     row.scrollIntoView({behavior:'smooth',block:'nearest'});
     try {
-      tipoAtual = batchTipo;
       const b64 = await toB64(f);
       const isPDF = f.type==='application/pdf';
       const cb = isPDF
         ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}}
         :{type:"image",source:{type:"base64",media_type:f.type||'image/jpeg',data:b64}};
       const p = await chamarIA([cb,{type:'text',text:buildPrompt('fatura')}],1000);
-      const fatura = {
-        tipo:batchTipo, perfil_nif:perfilAtivo.nif,
-        nc_tipo:batchTipo==='nota_credito'?'venda':null,
+
+      // Auto-detect tipo por ficheiro
+      tipoAtual = 'venda';
+      if(p.e_nota_credito){ tipoAtual='nota_credito'; }
+      else if(p.nif_cliente && perfilAtivo.nif && p.nif_cliente===perfilAtivo.nif){ tipoAtual='compra'; }
+
+      pendingF = {
+        tipo:tipoAtual, perfil_nif:perfilAtivo.nif,
+        nc_tipo:tipoAtual==='nota_credito'?'venda':null,
         fornecedor:p.fornecedor||'—', nif:p.nif_fornecedor||'—',
         numero:p.numero_fatura||'—', data:p.data||'—', isenta:!!p.isenta,
         estrangeira:!!p.estrangeira, pais_origem:p.pais_origem||null,
@@ -2336,29 +2274,55 @@ async function startBatch(){
         iva_estrangeira:(+p.iva_estrangeira||0)>0?(+p.iva_estrangeira):(+p.base_estrangeira||0)*0.22,
         total:+p.total||0, prestacoes:0, ficheiro:f.name
       };
-      recalcTotais(fatura);
-      // No batch, verificar duplicado silenciosamente (sem pop-up)
-      const dup = checkDuplicado(fatura);
+      recalcTotais(pendingF);
+      pendingLinhas = p.linhas_suspeitas||[];
+      pendingUploadFile = f;
+
+      // Revisão: NC standalone (ex: Airbnb NC separado)
+      if(tipoAtual==='nota_credito'){
+        st.textContent='⏸ Confirmar lado da NC…';
+        abrirModalNC();
+        await new Promise(r=>{ modalResolver=r; });
+      }
+      // Revisão: fatura estrangeira (Campo 16)
+      else if(p.estrangeira && p.base_estrangeira>0){
+        st.textContent='⏸ Confirmar estrangeira…';
+        document.getElementById('estNome').value=p.fornecedor||'';
+        document.getElementById('estPais').value=p.pais_origem||'';
+        document.getElementById('estBase').value=p.base_estrangeira||'';
+        document.getElementById('estIva').value=p.iva_estrangeira||'';
+        document.getElementById('modalEstrang').classList.add('show');
+        await new Promise(r=>{ modalResolver=r; });
+      }
+
+      // Revisão: prestações MEO/NOS
+      if(tipoAtual!=='nota_credito' && p.tem_prestacoes && pendingLinhas.length>0){
+        st.textContent='⏸ Confirmar prestações…';
+        abrirPrest();
+        await new Promise(r=>{ modalResolver=r; });
+      }
+
+      // Verificar duplicado
+      const dup = checkDuplicado(pendingF);
       if(dup){
         row.className='qrow error';
         ico.textContent='⚠️';
-        // Mostrar botão "Guardar mesmo assim" na linha
-        st.innerHTML='Já existe &nbsp;<button onclick="guardarFaturaBatch(this,'+JSON.stringify(fatura)+')" style="font-size:.65rem;padding:.15rem .45rem;background:var(--gold);color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:Syne,sans-serif;font-weight:700">Guardar mesmo assim</button>';
+        const fSnap={...pendingF};
+        st.innerHTML='Já existe &nbsp;<button onclick="guardarFaturaBatch(this,'+JSON.stringify(fSnap)+')" style="font-size:.65rem;padding:.15rem .45rem;background:var(--gold);color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:Syne,sans-serif;font-weight:700">Guardar mesmo assim</button>';
         ignoradas++;
       } else {
-        pendingUploadFile=f;
-        await guardarF(fatura, true); // skipDupCheck=true porque já verificámos
+        await guardarF(pendingF, true);
         done++;
-        let stText = fatura.fornecedor !== '—' ? fatura.fornecedor : 'Guardada';
-        // NC embebida no mesmo PDF (ex: NOS)
-        if(p.tem_nota_credito && batchTipo !== 'nota_credito'){
+        let stText = pendingF.fornecedor !== '—' ? pendingF.fornecedor : 'Guardada';
+        // NC embebida no mesmo PDF (ex: NOS, MEO)
+        if(p.tem_nota_credito && tipoAtual !== 'nota_credito'){
           try{
             const nc = await chamarIA([cb,{type:'text',text:buildPrompt('nc')}], 800);
             if(nc.tem !== false){
               const fNC={
                 tipo:'nota_credito', perfil_nif:perfilAtivo.nif, nc_tipo:'compra',
-                fornecedor:nc.fornecedor||fatura.fornecedor, nif:nc.nif_fornecedor||fatura.nif,
-                numero:nc.numero_fatura||'--', data:nc.data||fatura.data,
+                fornecedor:nc.fornecedor||pendingF.fornecedor, nif:nc.nif_fornecedor||pendingF.nif,
+                numero:nc.numero_fatura||'--', data:nc.data||pendingF.data,
                 isenta:false, estrangeira:false, pais_origem:null,
                 base_5:+nc.base_5||0, iva_5:+nc.iva_5||0,
                 base_12:+nc.base_12||0, iva_12:+nc.iva_12||0,
@@ -2371,7 +2335,7 @@ async function startBatch(){
               await guardarF(fNC, true);
               stText += ' + NC';
             }
-          }catch(e2){ /* NC falhou silenciosamente, fatura principal já guardada */ }
+          }catch(e2){ /* NC silenciosa, fatura principal já guardada */ }
         }
         row.className='qrow done';
         ico.textContent='✅';
