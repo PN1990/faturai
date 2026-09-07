@@ -1310,6 +1310,12 @@ async function extractData(){
 
     const p=await chamarIA([cb,{type:'text',text:prompt}],1000);
 
+    // Auto-deteta NC pelo título do documento (ex: Airbnb emite NC em PDF separado)
+    if(p.e_nota_credito && tipoAtual!=='nota_credito'){
+      tipoAtual='nota_credito';
+      setType('nota_credito');
+    }
+
     pendingF={
       tipo:tipoAtual,perfil_nif:perfilAtivo.nif,
       nc_tipo:tipoAtual==='nota_credito'?'venda':null,
@@ -1878,9 +1884,9 @@ function exportModelo30(){
   const mm  = document.getElementById('m30Mes').value;
   const nomesMes = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const nomeMes = nomesMes[parseInt(mm)];
-  // Faturas estrangeiras do mês selecionado
+  // Faturas e NCs estrangeiras do mês selecionado
   const estrang = faturas.filter(f=>{
-    if(f.perfil_nif!==perfilAtivo.nif||!f.estrangeira||f.tipo==='nota_credito') return false;
+    if(f.perfil_nif!==perfilAtivo.nif||!f.estrangeira) return false;
     const pts=(f.data||'').split('/');
     return pts.length===3 && parseInt(pts[2])===ano && pts[1].padStart(2,'0')===mm;
   });
@@ -1893,24 +1899,25 @@ function exportModelo30(){
     return nome||'Outro';
   };
 
-  // Agrupar por prestador
+  // Agrupar por prestador (NCs subtraem)
   const mapa = {};
   estrang.forEach(f => {
     const prest = identificar(f.fornecedor);
+    const sign = f.tipo==='nota_credito' ? -1 : 1;
     if(!mapa[prest]) mapa[prest] = {base:0, iva:0, n:0, faturas:[]};
-    mapa[prest].base += +f.base_estrangeira||0;
-    mapa[prest].iva  += +f.iva_estrangeira||0;
+    mapa[prest].base += sign * (+f.base_estrangeira||0);
+    mapa[prest].iva  += sign * (+f.iva_estrangeira||0);
     mapa[prest].n++;
-    mapa[prest].faturas.push(f.numero||'—');
+    mapa[prest].faturas.push((f.tipo==='nota_credito'?'NC:':'')+(f.numero||'—'));
   });
 
-  const h = ['Prestador','Nº Faturas','Números','Base (€)','IVA 22% (€)','Total (€)'];
+  const h = ['Prestador','Nº Docs','Números','Base (€)','IVA 22% (€)','Total (€)'];
   const rows = Object.entries(mapa).sort(([a],[b])=>a.localeCompare(b)).map(([prest,d])=>[
     prest, d.n, d.faturas.join(' | '),
     d.base.toFixed(2), d.iva.toFixed(2), (d.base+d.iva).toFixed(2)
   ]);
-  const totalBase = estrang.reduce((s,f)=>s+(+f.base_estrangeira||0),0);
-  const totalIva  = estrang.reduce((s,f)=>s+(+f.iva_estrangeira||0),0);
+  const totalBase = estrang.reduce((s,f)=>s+(f.tipo==='nota_credito'?-1:1)*(+f.base_estrangeira||0),0);
+  const totalIva  = estrang.reduce((s,f)=>s+(f.tipo==='nota_credito'?-1:1)*(+f.iva_estrangeira||0),0);
   rows.push(['TOTAL', estrang.length, '', totalBase.toFixed(2), totalIva.toFixed(2), (totalBase+totalIva).toFixed(2)]);
 
   const csv = '﻿' + h.join(';') + '\n' + rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
@@ -1942,13 +1949,13 @@ function exportModelo30XML(){
   const nomeMes = nomesMes[parseInt(mm)];
 
   const estrang = faturas.filter(f=>{
-    if(f.perfil_nif!==perfilAtivo.nif||!f.estrangeira||f.tipo==='nota_credito') return false;
+    if(f.perfil_nif!==perfilAtivo.nif||!f.estrangeira) return false;
     const pts=(f.data||'').split('/');
     return pts.length===3 && parseInt(pts[2])===ano && pts[1].padStart(2,'0')===mm;
   });
   if(!estrang.length){fecharModal('modalModelo30');return toast('⚠️ Sem faturas estrangeiras neste mês','error');}
 
-  // Agregar por fornecedor
+  // Agregar por fornecedor (NCs subtraem o rendimento)
   const mapa={};
   const desconhecidos=[];
   estrang.forEach(f=>{
@@ -1956,11 +1963,12 @@ function exportModelo30XML(){
     if(!dados){if(!desconhecidos.includes(f.fornecedor))desconhecidos.push(f.fornecedor);return;}
     const key=dados.beneficiario;
     if(!mapa[key]) mapa[key]={...dados, total:0};
-    mapa[key].total+=(+f.base_estrangeira||0);
+    const sign = f.tipo==='nota_credito' ? -1 : 1;
+    mapa[key].total += sign * (+f.base_estrangeira||0);
   });
 
-  const registos=Object.values(mapa);
-  if(!registos.length){fecharModal('modalModelo30');return toast('⚠️ Nenhum fornecedor reconhecido (Booking/Airbnb) neste mês','error');}
+  const registos=Object.values(mapa).filter(r=>r.total>0);
+  if(!registos.length){fecharModal('modalModelo30');return toast('⚠️ Nenhum fornecedor reconhecido (Booking/Airbnb) com rendimento positivo neste mês','error');}
 
   let xml=`<?xml version='1.0' encoding='ISO-8859-1'?>\n\n<Modelo30 xmlns="http://www.dgci.gov.pt/2002/OT">\n`;
   xml+=`<Declarante>${perfilAtivo.nif}</Declarante>\n`;
@@ -2517,9 +2525,11 @@ INSTRUCAO: Este PDF tem FATURA e NOTA DE CREDITO. Extrai SO a NOTA DE CREDITO (s
 
   return base+`
 
-{"fornecedor":"","nif_fornecedor":null,"nif_cliente":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"tem_nota_credito":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}
+{"fornecedor":"","nif_fornecedor":null,"nif_cliente":null,"numero_fatura":"","data":"DD/MM/AAAA","isenta":false,"estrangeira":false,"pais_origem":null,"e_nota_credito":false,"base_5":0,"iva_5":0,"base_12":0,"iva_12":0,"base_22":0,"iva_22":0,"base_isenta":0,"base_estrangeira":0,"iva_estrangeira":0,"total":0,"tem_prestacoes":false,"tem_nota_credito":false,"linhas_suspeitas":[{"descricao":"","motivo":"","valor":0,"iva":0}]}
 
-Nota: nif_cliente = NIF do DESTINATARIO/CLIENTE da fatura (o que recebe a fatura, nao o fornecedor). Deixa null se nao estiver visivel.`;
+Notas:
+- e_nota_credito=true se o titulo/cabecalho do documento for "Nota de credito" ou "Credit Note" (documento inteiramente uma NC, nao uma fatura com NC incorporada). Neste caso os valores devem ser positivos (ignora o sinal negativo do PDF).
+- nif_cliente = NIF do DESTINATARIO/CLIENTE da fatura (o que recebe a fatura, nao o fornecedor). Deixa null se nao estiver visivel.`;
 }
 
 
