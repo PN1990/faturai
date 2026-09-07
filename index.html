@@ -613,7 +613,8 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
       </div>
       <div style="display:flex;gap:.5rem">
         <button class="btn btn-outline btn-sm" style="flex:1" onclick="fecharModal('modalModelo30')">Cancelar</button>
-        <button class="btn btn-gold" style="flex:2;justify-content:center" onclick="exportModelo30()">⬇ Exportar Excel/CSV</button>
+        <button class="btn btn-gold" style="flex:1.5;justify-content:center;font-size:.75rem" onclick="exportModelo30()">⬇ Excel/CSV</button>
+        <button class="btn" style="flex:1.5;justify-content:center;background:var(--blue);color:#fff;font-size:.75rem" onclick="exportModelo30XML()">📋 XML Portal AT</button>
       </div>
     </div>
   </div>
@@ -1912,6 +1913,75 @@ function exportModelo30(){
   a.click();
   fecharModal('modalModelo30');
   toast(`🌍 Modelo 30 ${nomeMes} ${ano} — ${estrang.length} fatura(s) exportada(s)`, 'success');
+}
+
+// Dados fiscais dos fornecedores estrangeiros conhecidos
+const MOD30_FORNECEDORES = {
+  booking:  {beneficiario:'710671563', nifEstrangeiro:'805734958B01', pais:'528', tipoRend:'08', tributacao:'02'},
+  airbnb:   {beneficiario:'712026681', nifEstrangeiro:'9827384L',     pais:'372', tipoRend:'08', tributacao:'02'},
+};
+function mod30IdentFornecedor(nome){
+  const n=(nome||'').toLowerCase();
+  if(n.includes('booking')) return MOD30_FORNECEDORES.booking;
+  if(n.includes('airbnb'))  return MOD30_FORNECEDORES.airbnb;
+  return null; // desconhecido — omitido com aviso
+}
+
+function exportModelo30XML(){
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  const ano  = parseInt(document.getElementById('m30Ano').value);
+  const mm   = document.getElementById('m30Mes').value;
+  const nomesMes=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const nomeMes = nomesMes[parseInt(mm)];
+
+  const estrang = faturas.filter(f=>{
+    if(f.perfil_nif!==perfilAtivo.nif||!f.estrangeira||f.tipo==='nota_credito') return false;
+    const pts=(f.data||'').split('/');
+    return pts.length===3 && parseInt(pts[2])===ano && pts[1].padStart(2,'0')===mm;
+  });
+  if(!estrang.length){fecharModal('modalModelo30');return toast('⚠️ Sem faturas estrangeiras neste mês','error');}
+
+  // Agregar por fornecedor
+  const mapa={};
+  const desconhecidos=[];
+  estrang.forEach(f=>{
+    const dados=mod30IdentFornecedor(f.fornecedor);
+    if(!dados){if(!desconhecidos.includes(f.fornecedor))desconhecidos.push(f.fornecedor);return;}
+    const key=dados.beneficiario;
+    if(!mapa[key]) mapa[key]={...dados, total:0};
+    mapa[key].total+=(+f.base_estrangeira||0);
+  });
+
+  const registos=Object.values(mapa);
+  if(!registos.length){fecharModal('modalModelo30');return toast('⚠️ Nenhum fornecedor reconhecido (Booking/Airbnb) neste mês','error');}
+
+  let xml=`<?xml version='1.0' encoding='ISO-8859-1'?>\n\n<Modelo30 xmlns="http://www.dgci.gov.pt/2002/OT">\n`;
+  xml+=`<Declarante>${perfilAtivo.nif}</Declarante>\n`;
+  xml+=`<Ano>${ano}</Ano>\n`;
+  xml+=`<SF>3450</SF>\n`;
+  xml+=`<Tipo>1</Tipo>\n`;
+  xml+=`<Mes>${parseInt(mm)}</Mes>\n`;
+  xml+=`<Retidas>\n</Retidas>\n`;
+  registos.forEach((r,i)=>{
+    xml+=`<Registo numero="${i+1}">\n`;
+    xml+=`<Beneficiario>${r.beneficiario}</Beneficiario>\n`;
+    xml+=`<NIFEstrangeiro>${r.nifEstrangeiro}</NIFEstrangeiro>\n`;
+    xml+=`<Pais>${r.pais}</Pais>\n`;
+    xml+=`<TipoRend>${r.tipoRend}</TipoRend>\n`;
+    xml+=`<Rendimento>${r.total.toFixed(2)}</Rendimento>\n`;
+    xml+=`<Tributacao>${r.tributacao}</Tributacao>\n`;
+    xml+=`</Registo>\n`;
+  });
+  xml+=`</Modelo30>\n`;
+
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([xml],{type:'text/xml;charset=iso-8859-1'}));
+  a.download=`Modelo30_${perfilAtivo.nif}${ano}${mm}.xml`;
+  a.click();
+  fecharModal('modalModelo30');
+  let msg=`📋 XML gerado — ${registos.length} fornecedor(es)`;
+  if(desconhecidos.length) msg+=` · ⚠️ Ignorados: ${desconhecidos.join(', ')}`;
+  toast(msg, desconhecidos.length?'error':'success');
 }
 // ══════════════════════════════════════════════════
 // BACKUP COMPLETO
