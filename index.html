@@ -1513,32 +1513,29 @@ async function uploadToStorage(file, fatura){
 }
 async function downloadFaturaDoc(id, path){
   if(!path){toast('⚠️ Ficheiro não disponível — foi extraído antes de esta funcionalidade existir','error');return;}
-  const w=window.open('about:blank','_blank'); // síncrono para evitar popup blocker no desktop
+  showLoader('A obter ficheiro…');
   try{
-    const{data,error}=await sb.storage.from('faturas-docs').createSignedUrl(path,120);
+    const{data,error}=await sb.storage.from('faturas-docs').createSignedUrl(path,300);
     if(error)throw error;
-    if(w && !w.closed){
-      w.location.href=data.signedUrl;
-    } else {
-      // iOS Safari bloqueia mesmo com abertura síncrona — mostra link para toque manual
-      mostrarLinkDoc(data.signedUrl);
-    }
+    hideLoader();
+    mostrarLinkDoc(data.signedUrl);
   }catch(e){
-    if(w&&!w.closed)w.close();
+    hideLoader();
     toast('❌ Erro ao obter ficheiro: '+e.message,'error');
   }
 }
 function mostrarLinkDoc(url){
   const d=document.createElement('div');
+  d.id='docLinkOverlay';
   d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.2rem';
   d.innerHTML=`<div style="background:var(--card);border-radius:14px;padding:1.5rem 1.4rem;max-width:310px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3)">
     <div style="font-size:2rem;margin-bottom:.5rem">📎</div>
-    <div style="font-weight:700;font-size:1rem;margin-bottom:.3rem">Abrir ficheiro</div>
-    <div style="font-size:.76rem;color:var(--muted);margin-bottom:1.1rem">O browser bloqueou a abertura automática.</div>
-    <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:block;background:var(--blue);color:#fff;padding:.75rem 1rem;border-radius:9px;text-decoration:none;font-weight:700;font-size:.88rem;margin-bottom:.7rem" onclick="this.closest('[style*=fixed]').remove()">Abrir PDF / Fatura</a>
-    <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:.3rem">Fechar</button>
+    <div style="font-weight:700;font-size:1rem;margin-bottom:.8rem">Abrir ficheiro original</div>
+    <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:block;background:var(--blue);color:#fff;padding:.85rem 1rem;border-radius:9px;text-decoration:none;font-weight:700;font-size:.92rem;margin-bottom:.7rem">📄 Abrir PDF</a>
+    <button id="docLinkClose" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.82rem;padding:.4rem">Fechar</button>
   </div>`;
   document.body.appendChild(d);
+  document.getElementById('docLinkClose').addEventListener('click',()=>d.remove());
   d.addEventListener('click',e=>{if(e.target===d)d.remove();});
 }
 async function guardarF(f, skipDupCheck=false){
