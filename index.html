@@ -479,14 +479,22 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <div class="edit-field"><label class="edit-label">NIF</label><input class="edit-input" id="ef_nif" /></div>
         <div class="edit-field"><label class="edit-label">Nº Fatura</label><input class="edit-input" id="ef_numero" /></div>
         <div class="edit-field"><label class="edit-label">Data (DD/MM/AAAA)</label><input class="edit-input" id="ef_data" /></div>
-        <div class="edit-field"><label class="edit-label">Base 4% (€)</label><input class="edit-input" id="ef_base_5" type="number" step="0.01" /></div>
+        <div class="edit-field"><label class="edit-label">Base 4% (€)</label><input class="edit-input" id="ef_base_5" type="number" step="0.01" oninput="calcEditIva()" /></div>
         <div class="edit-field"><label class="edit-label">IVA 4% (€)</label><input class="edit-input" id="ef_iva_5" type="number" step="0.01" /></div>
-        <div class="edit-field"><label class="edit-label">Base 12% (€)</label><input class="edit-input" id="ef_base_12" type="number" step="0.01" /></div>
+        <div class="edit-field"><label class="edit-label">Base 12% (€)</label><input class="edit-input" id="ef_base_12" type="number" step="0.01" oninput="calcEditIva()" /></div>
         <div class="edit-field"><label class="edit-label">IVA 12% (€)</label><input class="edit-input" id="ef_iva_12" type="number" step="0.01" /></div>
-        <div class="edit-field"><label class="edit-label">Base 22% (€)</label><input class="edit-input" id="ef_base_22" type="number" step="0.01" /></div>
+        <div class="edit-field"><label class="edit-label">Base 22% (€)</label><input class="edit-input" id="ef_base_22" type="number" step="0.01" oninput="calcEditIva()" /></div>
         <div class="edit-field"><label class="edit-label">IVA 22% (€)</label><input class="edit-input" id="ef_iva_22" type="number" step="0.01" /></div>
         <div class="edit-field"><label class="edit-label">Base isenta (€)</label><input class="edit-input" id="ef_base_isenta" type="number" step="0.01" /></div>
         <div class="edit-field"><label class="edit-label">Total fatura (€)</label><input class="edit-input" id="ef_total" type="number" step="0.01" /></div>
+        <div class="edit-field edit-full">
+          <label class="edit-label">Tipo</label>
+          <div style="display:flex;gap:.4rem;margin-top:.2rem">
+            <button type="button" id="ef_tipo_venda" class="btn btn-sm" onclick="setEditTipo('venda')" style="flex:1;transition:background .15s">Venda</button>
+            <button type="button" id="ef_tipo_compra" class="btn btn-sm" onclick="setEditTipo('compra')" style="flex:1;transition:background .15s">Compra</button>
+            <button type="button" id="ef_tipo_nc" class="btn btn-sm" onclick="setEditTipo('nota_credito')" style="flex:1;transition:background .15s">Nota Crédito</button>
+          </div>
+        </div>
         <div class="edit-field edit-full"><label class="edit-label">📝 Nota</label><input class="edit-input" id="ef_nota" placeholder="Observações opcionais…" /></div>
       </div>
     </div>
@@ -987,7 +995,9 @@ const CORES=['#1a3a2a','#7b2d8b','#1a5276','#922b21','#784212','#b9770e','#145a3
 // STATE
 // ══════════════════════════════════════════════════
 let faturas=[], perfis=[], perfilAtivo=null;
-let tipoAtual='venda', pendingF=null, pendingLinhas=[], editingId=null;
+let tipoAtual='venda', pendingF=null, pendingLinhas=[], editingId=null, editTipo='venda';
+// Strip country prefix (PT, ES, FR…) from NIF for comparison
+function normNif(n){ return n ? String(n).replace(/^[A-Za-z]{2}/,'').trim() : n; }
 let pendingUploadFile=null; // ficheiro aguardando upload após guardarF
 let filterTipo='todos', editingPerfilNif=null;
 let session=null, dadosCarregados=false;
@@ -1256,7 +1266,7 @@ async function extractData(){
       setType('nota_credito');
     }
     // Auto-deteta Compra: se o nif_cliente corresponde ao perfil ativo, é uma fatura recebida
-    if(tipoAtual!=='nota_credito' && p.nif_cliente && perfilAtivo.nif && p.nif_cliente===perfilAtivo.nif && tipoAtual!=='compra'){
+    if(tipoAtual!=='nota_credito' && p.nif_cliente && perfilAtivo.nif && normNif(p.nif_cliente)===normNif(perfilAtivo.nif) && tipoAtual!=='compra'){
       tipoAtual='compra';
       setType('compra');
     }
@@ -1280,8 +1290,8 @@ async function extractData(){
     pendingUploadFile=file; // para upload ao Supabase Storage quando guardarF correr
     hideLoader();
 
-    // Aviso NIF cliente divergente
-    if(p.nif_cliente && perfilAtivo.nif && p.nif_cliente !== perfilAtivo.nif){
+    // Aviso NIF cliente divergente (ignora quando é compra — o nif_cliente é o nosso próprio NIF)
+    if(tipoAtual!=='compra' && p.nif_cliente && perfilAtivo.nif && normNif(p.nif_cliente) !== normNif(perfilAtivo.nif)){
       toast(`⚠️ NIF da fatura (${p.nif_cliente}) não corresponde ao perfil ativo (${perfilAtivo.nif}) — verifica se escolheste o perfil certo!`,'error');
     }
 
@@ -1409,10 +1419,12 @@ function abrirEdicao(id){
   ['fornecedor','nif','numero','data','base_5','iva_5','base_12','iva_12','base_22','iva_22','base_isenta','total','nota'].forEach(k=>{
     const el=document.getElementById('ef_'+k);if(el)el.value=f[k]??'';
   });
+  setEditTipo(f.tipo||'venda');
   document.getElementById('modalEdit').classList.add('show');
 }
 async function guardarEdicao(){
   const upd={
+    tipo:editTipo,
     fornecedor:document.getElementById('ef_fornecedor').value,
     nif:document.getElementById('ef_nif').value,
     numero:document.getElementById('ef_numero').value,
@@ -2258,7 +2270,7 @@ async function startBatch(){
       // Auto-detect tipo por ficheiro
       tipoAtual = 'venda';
       if(p.e_nota_credito){ tipoAtual='nota_credito'; }
-      else if(p.nif_cliente && perfilAtivo.nif && p.nif_cliente===perfilAtivo.nif){ tipoAtual='compra'; }
+      else if(p.nif_cliente && perfilAtivo.nif && normNif(p.nif_cliente)===normNif(perfilAtivo.nif)){ tipoAtual='compra'; }
 
       pendingF = {
         tipo:tipoAtual, perfil_nif:perfilAtivo.nif,
@@ -2372,6 +2384,28 @@ function setManualType(t){
   document.getElementById('manBtnV').className='type-btn '+(t==='venda'?'av':'');
   document.getElementById('manBtnC').className='type-btn '+(t==='compra'?'ac':'');
   document.getElementById('manBtnN').className='type-btn '+(t==='nota_credito'?'an':'');
+}
+
+function calcEditIva(){
+  const b5=parseFloat(document.getElementById('ef_base_5').value)||0;
+  const b12=parseFloat(document.getElementById('ef_base_12').value)||0;
+  const b22=parseFloat(document.getElementById('ef_base_22').value)||0;
+  document.getElementById('ef_iva_5').value = b5 ? (b5*0.04).toFixed(2) : '';
+  document.getElementById('ef_iva_12').value = b12 ? (b12*0.12).toFixed(2) : '';
+  document.getElementById('ef_iva_22').value = b22 ? (b22*0.22).toFixed(2) : '';
+}
+
+function setEditTipo(t){
+  editTipo=t;
+  const colors={venda:'#27ae60',compra:'#2980b9',nota_credito:'#e67e22'};
+  ['venda','compra','nota_credito'].forEach(x=>{
+    const btn=document.getElementById('ef_tipo_'+x.replace('_','_'));
+    if(!btn)return;
+    const active=x===t;
+    btn.style.background=active?colors[x]:'';
+    btn.style.color=active?'#fff':'';
+    btn.style.borderColor=active?colors[x]:'';
+  });
 }
 
 function calcManualIva(){
