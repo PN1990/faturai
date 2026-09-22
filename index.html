@@ -861,6 +861,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
           <button class="btn btn-outline btn-sm" onclick="calcular()">🔄 Recalcular</button>
         </div>
         <button class="btn btn-gold" onclick="exportPDF()">📄 PDF</button>
+        <button class="btn" style="background:var(--blue);color:#fff" onclick="exportDPIVAXML()">🧾 XML AT</button>
         <button class="btn btn-outline btn-sm" onclick="toggleDashboard()">📈 Anual</button>
       </div>
     </div>
@@ -975,6 +976,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
             </div>
             <div style="margin-top:.85rem;display:flex;flex-direction:column;gap:.4rem">
               <button class="btn btn-gold" onclick="exportPDF()" style="width:100%;justify-content:center">📄 Exportar PDF</button>
+              <button class="btn" onclick="exportDPIVAXML()" style="width:100%;justify-content:center;background:var(--blue);color:#fff">🧾 XML para Portal AT</button>
               <button class="btn btn-outline" onclick="calcular()" style="width:100%;justify-content:center">🔄 Recalcular</button>
             </div>
             <div class="info-box gold" style="margin-top:.85rem;margin-bottom:0;font-size:.7rem">⚠️ Valores indicativos. Confirma sempre na AT.</div>
@@ -1668,6 +1670,7 @@ async function clearAll(){
 // ══════════════════════════════════════════════════
 // CALCULAR DECLARAÇÃO
 // ══════════════════════════════════════════════════
+let ultimoApuramento=null;
 function calcular(){
   if(!perfilAtivo)return;
   const ano=parseInt(document.getElementById('selAno').value);
@@ -1724,6 +1727,7 @@ function calcular(){
   sf('d33',cit+ci22_ext,(cit+ci22_ext)===0,'g');
   sf('d61',c61,false,'g'); sf('d65',c65,false,'g'); sf('d67',c67,c67===0,'g');
   sf('d91',c65+c67,(c65+c67)===0,'g');
+  ultimoApuramento={ano,trim,vb5,vi5,vb12,vi12,vb22,vi22,vis,vbe,vie,vbt,vit,dedutivel:cit+ci22_ext,c96,resultado};
 
   if(resultado>=0){
     document.getElementById('d93wrap').style.display='';
@@ -1762,6 +1766,80 @@ function calcular(){
 // ══════════════════════════════════════════════════
 // PDF
 // ══════════════════════════════════════════════════
+// Prazos de entrega DP IVA trimestral (fonte: calendário AT)
+const PRAZOS_DP={'2025-4':'2026-02-20','2026-1':'2026-05-22','2026-2':'2026-09-20','2026-3':'2026-11-20'};
+function prazoEntregaDP(ano,trim){
+  const k=ano+'-'+trim;
+  if(PRAZOS_DP[k]) return new Date(PRAZOS_DP[k]+'T23:59:59');
+  // 2T vai para setembro (agosto é excluído); restantes: dia 20 do 2.º mês seguinte
+  const mesFim=trim*3, mesPrazo=trim===2?9:mesFim+2;
+  const d=new Date(ano+(mesPrazo>12?1:0),(mesPrazo-1)%12,20,23,59,59);
+  while(d.getDay()===0||d.getDay()===6) d.setDate(d.getDate()+1);
+  return d;
+}
+
+function exportDPIVAXML(){
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  calcular();
+  const a=ultimoApuramento;
+  if(!a) return;
+  if(Math.abs(a.vb12)>0.005||Math.abs(a.vis)>0.005){
+    if(!confirm('Este período tem operações a 12% ou isentas, que não vão no XML. Terás de as preencher à mão no Portal AT. Continuar?')) return;
+  }
+  const ct=v=>String(Math.round(v*100));
+  const deb=a.vit, cred=a.dedutivel+a.c96;
+  const semOps=[a.vbt,a.vit,a.dedutivel].every(v=>Math.abs(v)<0.005);
+  const foraPrazo=new Date()>prazoEntregaDP(a.ano,a.trim);
+  const periodo=String(a.trim*3).padStart(2,'0')+'T';
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<dpiva xmlns="http://www.at.gov.pt/schemas/dpiva" version="06">
+	<rosto>
+		<apuramento>
+			<btBensUETotal>0</btBensUETotal>
+			<btServicosUE>${ct(a.vbe)}</btServicosUE>
+			<btTaxaNormal>${ct(a.vb22)}</btTaxaNormal>
+			<btTaxaReduzida>${ct(a.vb5)}</btTaxaReduzida>
+			<btTotal>${ct(a.vb5+a.vb22+a.vbe)}</btTotal>
+			<excessoAReportarPeriodoAnterior>${ct(a.c96)}</excessoAReportarPeriodoAnterior>
+			<ivaAEntregar>${ct(Math.max(deb-cred,0))}</ivaAEntregar>
+			<ivaARecuperar>${ct(Math.max(cred-deb,0))}</ivaARecuperar>
+			<ivaBensUETotal>0</ivaBensUETotal>
+			<ivaDedutivelAnexosRTotal>0</ivaDedutivelAnexosRTotal>
+			<ivaDedutivelOutros>${ct(a.dedutivel)}</ivaDedutivelOutros>
+			<ivaDedutivelTotal>${ct(a.dedutivel)}</ivaDedutivelTotal>
+			<ivaFavorEstadoTotal>${ct(deb)}</ivaFavorEstadoTotal>
+			<ivaFavorSujPassivoTotal>${ct(cred)}</ivaFavorSujPassivoTotal>
+			<ivaServicosUE>${ct(a.vie)}</ivaServicosUE>
+			<ivaTaxaNormal>${ct(a.vi22)}</ivaTaxaNormal>
+			<ivaTaxaReduzida>${ct(a.vi5)}</ivaTaxaReduzida>
+			<temOperacoesAdquirenteComLiqImposto>02</temOperacoesAdquirenteComLiqImposto>
+		</apuramento>
+		<desenvolvimento>
+			<totalQuadro06A>0</totalQuadro06A>
+		</desenvolvimento>
+		<inicio>
+			<anoDeclaracao>${a.ano}</anoDeclaracao>
+			<apresentouDeclRecapitulativa>false</apresentouDeclRecapitulativa>
+			<atividadesImobiliarias>false</atividadesImobiliarias>
+			<localizacaoSede>3</localizacaoSede>
+			<nif>${perfilAtivo.nif}</nif>
+			<periodoDeclaracao>${periodo}</periodoDeclaracao>
+			<prazo>${foraPrazo?2:1}</prazo>
+			<semOperacoes>${semOps}</semOperacoes>
+			<temAnexoRAcores>false</temAnexoRAcores>
+			<temAnexoRContinente>false</temAnexoRContinente>
+			<temAnexoRMadeira>false</temAnexoRMadeira>
+		</inicio>
+	</rosto>
+</dpiva>
+`;
+  const el=document.createElement('a');
+  el.href=URL.createObjectURL(new Blob([xml],{type:'application/xml'}));
+  el.download=`dpiva-${String(a.ano).slice(2)}${periodo}-${perfilAtivo.nif}.xml`;
+  document.body.appendChild(el);el.click();el.remove();
+  toast(`🧾 XML gerado${foraPrazo?' (fora de prazo)':''}. Carrega-o no Portal AT e confirma os valores.`,'success');
+}
+
 function exportPDF(){
   const{jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
