@@ -929,25 +929,9 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <div class="card" style="margin-bottom:1rem">
           <div class="card-header"><span class="card-title">Quadro 07 — Operações Passivas (Compras)</span></div>
           <div class="card-body" style="padding:.85rem">
-            <div class="decl-sec">Taxa Reduzida — 4%</div>
             <div class="decl-grid">
-              <div class="df hg"><div class="fn g">20</div><div class="fi"><div class="fl">Base dedutível (4%)</div><div class="fv g" id="d20">0,00 €</div></div></div>
-              <div class="df hg"><div class="fn g">21</div><div class="fi"><div class="fl">IVA dedutível (4%)</div><div class="fv g" id="d21">0,00 €</div></div></div>
-            </div>
-            <div class="decl-sec">Taxa Intermédia — 12%</div>
-            <div class="decl-grid">
-              <div class="df hg"><div class="fn g">22</div><div class="fi"><div class="fl">Base dedutível (12%)</div><div class="fv g" id="d22">0,00 €</div></div></div>
-              <div class="df hg"><div class="fn g">23</div><div class="fi"><div class="fl">IVA dedutível (12%)</div><div class="fv g" id="d23">0,00 €</div></div></div>
-            </div>
-            <div class="decl-sec">Taxa Normal — 22%</div>
-            <div class="decl-grid">
-              <div class="df hg"><div class="fn g">24</div><div class="fi"><div class="fl">Base dedutível (22%) + autoliq.</div><div class="fv g" id="d24">0,00 €</div></div></div>
-              <div class="df hg"><div class="fn g">25</div><div class="fi"><div class="fl">IVA dedutível (22%) + autoliq.</div><div class="fv g" id="d25">0,00 €</div></div></div>
-            </div>
-            <div class="decl-sec">Totais</div>
-            <div class="decl-grid">
-              <div class="df hg"><div class="fn g">32</div><div class="fi"><div class="fl">Total base dedutível</div><div class="fv g" id="d32">0,00 €</div></div></div>
-              <div class="df hg"><div class="fn g">33</div><div class="fi"><div class="fl">Total IVA dedutível</div><div class="fv g" id="d33">0,00 €</div></div></div>
+              <div class="df hg full"><div class="fn g">24</div><div class="fi"><div class="fl">IVA dedutível — compras + autoliquidação (incl. campo 17)</div><div class="fv g" id="d24">0,00 €</div></div></div>
+              <div class="df hg full"><div class="fn g">∑ 20–24</div><div class="fi"><div class="fl">Total IVA dedutível</div><div class="fv g" id="d33">0,00 €</div></div></div>
             </div>
           </div>
         </div>
@@ -957,11 +941,12 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
           <div class="card-header"><span class="card-title">Quadro 09 — Apuramento</span></div>
           <div class="card-body" style="padding:.85rem">
             <div class="decl-grid">
-              <div class="df hl"><div class="fn g">61</div><div class="fi"><div class="fl">Total IVA liquidado</div><div class="fv g" id="d61">0,00 €</div></div></div>
-              <div class="df hg"><div class="fn g">65</div><div class="fi"><div class="fl">Total IVA dedutível</div><div class="fv g" id="d65">0,00 €</div></div></div>
-              <div class="df hg full"><div class="fn g">67</div><div class="fi"><div class="fl">Excesso período anterior (campo 96)</div><div class="fv g" id="d67">0,00 €</div></div></div>
-              <div class="df full hl" id="d93wrap"><div class="fn">93</div><div class="fi"><div class="fl">IVA a pagar (61 − 65 − 67)</div><div class="fv r" id="d93">0,00 €</div></div></div>
-              <div class="df full hg" id="d94wrap" style="display:none"><div class="fn g">94</div><div class="fi"><div class="fl">Excesso a reportar (65 + 67 − 61)</div><div class="fv rc" id="d94">0,00 €</div></div></div>
+              <div class="df hl"><div class="fn g">92</div><div class="fi"><div class="fl">Total IVA a favor do Estado</div><div class="fv g" id="d61">0,00 €</div></div></div>
+              <div class="df hg"><div class="fn g">∑ 20–24</div><div class="fi"><div class="fl">Total IVA dedutível</div><div class="fv g" id="d65">0,00 €</div></div></div>
+              <div class="df hg"><div class="fn g">61</div><div class="fi"><div class="fl">Excesso período anterior (campo 96)</div><div class="fv g" id="d67">0,00 €</div></div></div>
+              <div class="df hg full"><div class="fn g">91</div><div class="fi"><div class="fl">Total IVA a favor do sujeito passivo (∑20–24 + campo 61)</div><div class="fv g" id="d91">0,00 €</div></div></div>
+              <div class="df full hl" id="d93wrap"><div class="fn">93</div><div class="fi"><div class="fl">IVA a pagar (92 − 91)</div><div class="fv r" id="d93">0,00 €</div></div></div>
+              <div class="df full hg" id="d94wrap" style="display:none"><div class="fn g">94</div><div class="fi"><div class="fl">Excesso a reportar (91 − 92)</div><div class="fv rc" id="d94">0,00 €</div></div></div>
               <div class="df full" id="d96wrap" style="display:none"><div class="fn g">96</div><div class="fi"><div class="fl">Campo 96 — para declaração seguinte</div><div class="fv rc" id="d96">0,00 €</div></div><button onclick="guardarCampo96()" class="btn btn-sm" style="background:var(--success-light);color:var(--success);border:1px solid rgba(45,92,66,.2);white-space:nowrap;margin-left:.5rem;flex-shrink:0" title="Guardar como Campo 96 do próximo trimestre">💾 Guardar p/ próx. trim.</button></div>
             </div>
           </div>
@@ -1735,11 +1720,10 @@ function calcular(){
   sf('d08',vis,vis===0); sf('d09',0,true);
   sf('d16',vbe,vbe===0,'b'); sf('d17',vie,vie===0,'b');
   sf('d10',vbt,vbt===0); sf('d11',vit,vit===0,'g');
-  sf('d20',cb5,cb5===0,'g'); sf('d21',ci5,ci5===0,'g');
-  sf('d22',cb12,cb12===0,'g'); sf('d23',ci12,ci12===0,'g');
-  sf('d24',cb22+cb22_ext,( cb22+cb22_ext)===0,'g'); sf('d25',ci22+ci22_ext,(ci22+ci22_ext)===0,'g');
-  sf('d32',cbt+cb22_ext,(cbt+cb22_ext)===0,'g'); sf('d33',cit+ci22_ext,(cit+ci22_ext)===0,'g');
+  sf('d24',cit+ci22_ext,(cit+ci22_ext)===0,'g');
+  sf('d33',cit+ci22_ext,(cit+ci22_ext)===0,'g');
   sf('d61',c61,false,'g'); sf('d65',c65,false,'g'); sf('d67',c67,c67===0,'g');
+  sf('d91',c65+c67,(c65+c67)===0,'g');
 
   if(resultado>=0){
     document.getElementById('d93wrap').style.display='';
@@ -1826,20 +1810,15 @@ function exportPDF(){
   ]);
 
   ds('QUADRO 07 - COMPRAS',[
-    ['20','Base dedutivel - 4%',g('d20')],
-    ['21','IVA dedutivel - 4%',g('d21')],
-    ['22','Base dedutivel - 12%',g('d22')],
-    ['23','IVA dedutivel - 12%',g('d23')],
-    ['24','Base dedutivel - 22%',g('d24')],
-    ['25','IVA dedutivel - 22%',g('d25')],
-    ['32','TOTAL Base Dedutivel',g('d32')],
-    ['33','TOTAL IVA Dedutivel',g('d33')],
+    ['24','IVA Dedutivel (compras + autoliq. campo 17)',g('d24')],
+    ['∑20-24','TOTAL IVA Dedutivel',g('d33')],
   ],[201,146,42]);
 
   ds('QUADRO 09 - APURAMENTO',[
-    ['61','Total IVA Liquidado',g('d61')],
-    ['65','Total IVA Dedutivel',g('d65')],
-    ['67','Excesso Periodo Anterior',fmt(c96)],
+    ['92','Total IVA a favor do Estado',g('d61')],
+    ['∑20-24','Total IVA Dedutivel',g('d65')],
+    ['61','Excesso Periodo Anterior',fmt(c96)],
+    ['91','Total IVA a favor do passivo',g('d91')],
     [iva94?'94':'93',iva94?'Excesso a Reportar':'IVA a Pagar',iva94?g('d94'):g('d93')],
     ...(iva94?[['96','Campo 96 - proxima declaracao',g('d96')]]:[] ),
   ]);
