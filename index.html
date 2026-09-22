@@ -487,6 +487,17 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <div class="edit-field"><label class="edit-label">IVA 22% (€)</label><input class="edit-input" id="ef_iva_22" type="number" step="0.01" /></div>
         <div class="edit-field"><label class="edit-label">Base isenta (€)</label><input class="edit-input" id="ef_base_isenta" type="number" step="0.01" /></div>
         <div class="edit-field"><label class="edit-label">Total fatura (€)</label><input class="edit-input" id="ef_total" type="number" step="0.01" /></div>
+        <div class="edit-field edit-full" style="margin-top:.2rem">
+          <label class="edit-label" style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+            <input type="checkbox" id="ef_estrangeira" onchange="toggleEditEstrang(this.checked)" style="width:1rem;height:1rem;cursor:pointer" />
+            🌍 Campo 16 — Fatura estrangeira (Airbnb, Booking, Google…)
+          </label>
+        </div>
+        <div id="ef_estrang_row" style="display:none;contents">
+          <div class="edit-field"><label class="edit-label">Base Campo 16 (€)</label><input class="edit-input" id="ef_base_estrangeira" type="number" step="0.01" oninput="document.getElementById('ef_iva_estrangeira').value=((parseFloat(this.value)||0)*0.22).toFixed(2)" /></div>
+          <div class="edit-field"><label class="edit-label">IVA Campo 16 (€)</label><input class="edit-input" id="ef_iva_estrangeira" type="number" step="0.01" /></div>
+          <div class="edit-field"><label class="edit-label">País de origem</label><input class="edit-input" id="ef_pais_origem" placeholder="ex: IE, NL, US…" /></div>
+        </div>
         <div class="edit-field edit-full">
           <label class="edit-label">Tipo</label>
           <div style="display:flex;gap:.4rem;margin-top:.2rem">
@@ -1430,14 +1441,28 @@ function abrirEdicao(id){
   ['fornecedor','nif','numero','data','base_5','iva_5','base_12','iva_12','base_22','iva_22','base_isenta','total','nota'].forEach(k=>{
     const el=document.getElementById('ef_'+k);if(el)el.value=f[k]??'';
   });
+  const estrangCheck=document.getElementById('ef_estrangeira');
+  if(estrangCheck) estrangCheck.checked=!!f.estrangeira;
+  toggleEditEstrang(!!f.estrangeira);
+  if(f.estrangeira){
+    const be=document.getElementById('ef_base_estrangeira');const ie=document.getElementById('ef_iva_estrangeira');const pe=document.getElementById('ef_pais_origem');
+    if(be)be.value=f.base_estrangeira||'';
+    if(ie)ie.value=f.iva_estrangeira||'';
+    if(pe)pe.value=f.pais_origem||'';
+  }
   setEditTipo(f.tipo||'venda');
   setEditNcTipo(f.nc_tipo||'venda');
   document.getElementById('modalEdit').classList.add('show');
 }
 async function guardarEdicao(){
+  const efEstrang=document.getElementById('ef_estrangeira')?.checked||false;
   const upd={
     tipo:editTipo,
     nc_tipo:editTipo==='nota_credito'?editNcTipo:null,
+    estrangeira:efEstrang,
+    base_estrangeira:efEstrang?(parseFloat(document.getElementById('ef_base_estrangeira')?.value)||0):0,
+    iva_estrangeira:efEstrang?(parseFloat(document.getElementById('ef_iva_estrangeira')?.value)||0):0,
+    pais_origem:efEstrang?(document.getElementById('ef_pais_origem')?.value.trim()||null):null,
     fornecedor:document.getElementById('ef_fornecedor').value,
     nif:document.getElementById('ef_nif').value,
     numero:document.getElementById('ef_numero').value,
@@ -1488,16 +1513,33 @@ async function uploadToStorage(file, fatura){
 }
 async function downloadFaturaDoc(id, path){
   if(!path){toast('⚠️ Ficheiro não disponível — foi extraído antes de esta funcionalidade existir','error');return;}
-  // Abre janela de forma síncrona para evitar bloqueio de popups
-  const w=window.open('about:blank','_blank');
+  const w=window.open('about:blank','_blank'); // síncrono para evitar popup blocker no desktop
   try{
     const{data,error}=await sb.storage.from('faturas-docs').createSignedUrl(path,120);
     if(error)throw error;
-    w.location.href=data.signedUrl;
+    if(w && !w.closed){
+      w.location.href=data.signedUrl;
+    } else {
+      // iOS Safari bloqueia mesmo com abertura síncrona — mostra link para toque manual
+      mostrarLinkDoc(data.signedUrl);
+    }
   }catch(e){
-    if(w)w.close();
+    if(w&&!w.closed)w.close();
     toast('❌ Erro ao obter ficheiro: '+e.message,'error');
   }
+}
+function mostrarLinkDoc(url){
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.2rem';
+  d.innerHTML=`<div style="background:var(--card);border-radius:14px;padding:1.5rem 1.4rem;max-width:310px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3)">
+    <div style="font-size:2rem;margin-bottom:.5rem">📎</div>
+    <div style="font-weight:700;font-size:1rem;margin-bottom:.3rem">Abrir ficheiro</div>
+    <div style="font-size:.76rem;color:var(--muted);margin-bottom:1.1rem">O browser bloqueou a abertura automática.</div>
+    <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:block;background:var(--blue);color:#fff;padding:.75rem 1rem;border-radius:9px;text-decoration:none;font-weight:700;font-size:.88rem;margin-bottom:.7rem" onclick="this.closest('[style*=fixed]').remove()">Abrir PDF / Fatura</a>
+    <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:.3rem">Fechar</button>
+  </div>`;
+  document.body.appendChild(d);
+  d.addEventListener('click',e=>{if(e.target===d)d.remove();});
 }
 async function guardarF(f, skipDupCheck=false){
   recalcTotais(f);
@@ -2458,6 +2500,15 @@ function setEditTipo(t){
   if(ncRow)ncRow.style.display=t==='nota_credito'?'':'none';
 }
 
+function toggleEditEstrang(on){
+  document.getElementById('ef_estrang_row').style.display=on?'contents':'none';
+  if(!on){
+    ['ef_base_estrangeira','ef_iva_estrangeira','ef_pais_origem'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.value='';
+    });
+  }
+}
+
 function setEditNcTipo(t){
   editNcTipo=t;
   ['venda','compra'].forEach(x=>{
@@ -2566,7 +2617,7 @@ INSTRUCOES DE EXTRACAO:
 - base_5 = soma de todas as bases a 4% (inclui consumo de agua, energia a taxa reduzida, CAV, etc.)
 - base_22 = soma de todas as bases a 22% (inclui potencia contratada, taxas de exploracao, etc.)
 - base_isenta = valor isento de IVA (saneamento, residuos solidos, etc. marcados como 0% ou isento)
-- iva_5 = soma de todo o IVA a 4%
+- iva_5 = EXATAMENTE base_5 * 0.04 (taxa Madeira e 4%, NAO 5% do continente)
 - iva_22 = soma de todo o IVA a 22%
 - total = base tributavel + IVA dos servicos da fatura atual. NAO incluas prestacoes/amortizacoes de equipamento de periodos anteriores (ex: MEO/NOS cobram prestacao de equipamento separada dos servicos — ignora esse valor no total)
 - NUNCA deixes base_5 ou base_22 a zero se existirem valores no documento
