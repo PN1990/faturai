@@ -495,6 +495,13 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
             <button type="button" id="ef_tipo_nc" class="btn btn-sm" onclick="setEditTipo('nota_credito')" style="flex:1;transition:background .15s">Nota Crédito</button>
           </div>
         </div>
+        <div class="edit-field edit-full" id="ef_nc_tipo_row" style="display:none">
+          <label class="edit-label">Afeta</label>
+          <div style="display:flex;gap:.4rem;margin-top:.2rem">
+            <button type="button" id="ef_nct_venda" class="btn btn-sm" onclick="setEditNcTipo('venda')" style="flex:1;transition:background .15s">📤 Vendas</button>
+            <button type="button" id="ef_nct_compra" class="btn btn-sm" onclick="setEditNcTipo('compra')" style="flex:1;transition:background .15s">📥 Compras</button>
+          </div>
+        </div>
         <div class="edit-field edit-full"><label class="edit-label">📝 Nota</label><input class="edit-input" id="ef_nota" placeholder="Observações opcionais…" /></div>
       </div>
     </div>
@@ -791,6 +798,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
             <span style="font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Gerir</span>
             <button class="btn btn-outline btn-sm" onclick="exportBackup()" title="Backup completo de todas as faturas">💾 Backup</button>
             <button class="btn btn-outline btn-sm" onclick="abrirImportBackup()">📥 Importar</button>
+            <button class="btn btn-sm" style="background:rgba(52,152,219,.1);color:var(--blue);border:1px solid rgba(52,152,219,.3)" onclick="corrigirIva4()" title="Recalcula o IVA 4% de todas as faturas com base_5 > 0">🔧 IVA 4%</button>
             <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1px solid rgba(192,57,43,.2)" onclick="clearAll()">🗑 Limpar</button>
           </div>
         </div>
@@ -995,7 +1003,7 @@ const CORES=['#1a3a2a','#7b2d8b','#1a5276','#922b21','#784212','#b9770e','#145a3
 // STATE
 // ══════════════════════════════════════════════════
 let faturas=[], perfis=[], perfilAtivo=null;
-let tipoAtual='venda', pendingF=null, pendingLinhas=[], editingId=null, editTipo='venda';
+let tipoAtual='venda', pendingF=null, pendingLinhas=[], editingId=null, editTipo='venda', editNcTipo='venda';
 // Strip country prefix (PT, ES, FR…) from NIF for comparison
 function normNif(n){ return n ? String(n).replace(/^[A-Za-z]{2}/,'').trim() : n; }
 let pendingUploadFile=null; // ficheiro aguardando upload após guardarF
@@ -1285,6 +1293,9 @@ async function extractData(){
       iva_estrangeira:(+p.iva_estrangeira||0)>0?(+p.iva_estrangeira):(+p.base_estrangeira||0)*0.22,
       total:+p.total||0,prestacoes:0,ficheiro:file.name
     };
+    // Auto-corrigir IVA 4%: a IA pode usar 5% (taxa continental) em vez de 4% (Madeira)
+    if(pendingF.base_5>0 && Math.abs(pendingF.iva_5-pendingF.base_5*0.04)>0.02)
+      pendingF.iva_5=+(pendingF.base_5*0.04).toFixed(2);
     recalcTotais(pendingF);
     pendingLinhas=p.linhas_suspeitas||[];
     pendingUploadFile=file; // para upload ao Supabase Storage quando guardarF correr
@@ -1420,11 +1431,13 @@ function abrirEdicao(id){
     const el=document.getElementById('ef_'+k);if(el)el.value=f[k]??'';
   });
   setEditTipo(f.tipo||'venda');
+  setEditNcTipo(f.nc_tipo||'venda');
   document.getElementById('modalEdit').classList.add('show');
 }
 async function guardarEdicao(){
   const upd={
     tipo:editTipo,
+    nc_tipo:editTipo==='nota_credito'?editNcTipo:null,
     fornecedor:document.getElementById('ef_fornecedor').value,
     nif:document.getElementById('ef_nif').value,
     numero:document.getElementById('ef_numero').value,
@@ -1475,11 +1488,16 @@ async function uploadToStorage(file, fatura){
 }
 async function downloadFaturaDoc(id, path){
   if(!path){toast('⚠️ Ficheiro não disponível — foi extraído antes de esta funcionalidade existir','error');return;}
+  // Abre janela de forma síncrona para evitar bloqueio de popups
+  const w=window.open('about:blank','_blank');
   try{
-    const{data,error}=await sb.storage.from('faturas-docs').createSignedUrl(path,60);
+    const{data,error}=await sb.storage.from('faturas-docs').createSignedUrl(path,120);
     if(error)throw error;
-    window.open(data.signedUrl,'_blank');
-  }catch(e){toast('❌ Erro ao obter ficheiro: '+e.message,'error');}
+    w.location.href=data.signedUrl;
+  }catch(e){
+    if(w)w.close();
+    toast('❌ Erro ao obter ficheiro: '+e.message,'error');
+  }
 }
 async function guardarF(f, skipDupCheck=false){
   recalcTotais(f);
@@ -1587,6 +1605,31 @@ async function delFatura(id){
   try{await sbDelete(id);faturas=faturas.filter(f=>f.id!==id);renderFaturas();calcular();toast('🗑 Apagada','info')}
   catch(e){toast('❌ '+e.message,'error')}
 }
+async function corrigirIva4(){
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  const alvos = faturas.filter(f=>
+    f.perfil_nif===perfilAtivo.nif &&
+    f.base_5>0 &&
+    Math.abs((+f.iva_5||0) - f.base_5*0.04) > 0.02
+  );
+  if(alvos.length===0){ toast('✅ Nenhuma fatura com IVA 4% incorreto!','success'); return; }
+  if(!confirm(`Corrigir IVA 4% em ${alvos.length} fatura(s)?\n\nO IVA será recalculado como base×4%.`)) return;
+  showLoader(`A corrigir ${alvos.length} fatura(s)…`);
+  let ok=0, fail=0;
+  for(const f of alvos){
+    try{
+      const iva5=+(f.base_5*0.04).toFixed(2);
+      await sbUpdate(f.id,{iva_5:iva5});
+      f.iva_5=iva5;
+      f.iva_total=(+f.iva_5||0)+(+f.iva_12||0)+(+f.iva_22||0);
+      ok++;
+    }catch(e){ fail++; }
+  }
+  hideLoader();
+  renderFaturas();calcular();
+  toast(`✅ ${ok} fatura(s) corrigidas`+(fail?` · ❌ ${fail} erros`:''),'success');
+}
+
 async function clearAll(){
   if(!confirm('Apagar TODAS as faturas do perfil "'+perfilAtivo?.nome+'"? Esta ação é irreversível.'))return;
   showLoader('A apagar…');
@@ -2286,6 +2329,9 @@ async function startBatch(){
         iva_estrangeira:(+p.iva_estrangeira||0)>0?(+p.iva_estrangeira):(+p.base_estrangeira||0)*0.22,
         total:+p.total||0, prestacoes:0, ficheiro:f.name
       };
+      // Auto-corrigir IVA 4%: a IA pode usar 5% (taxa continental) em vez de 4% (Madeira)
+      if(pendingF.base_5>0 && Math.abs(pendingF.iva_5-pendingF.base_5*0.04)>0.02)
+        pendingF.iva_5=+(pendingF.base_5*0.04).toFixed(2);
       recalcTotais(pendingF);
       pendingLinhas = p.linhas_suspeitas||[];
       pendingUploadFile = f;
@@ -2342,6 +2388,8 @@ async function startBatch(){
                 base_isenta:+nc.base_isenta||0, base_estrangeira:0, iva_estrangeira:0,
                 total:+nc.total||0, prestacoes:0, nota:null, ficheiro:f.name
               };
+              if(fNC.base_5>0 && Math.abs(fNC.iva_5-fNC.base_5*0.04)>0.02)
+                fNC.iva_5=+(fNC.base_5*0.04).toFixed(2);
               recalcTotais(fNC);
               pendingUploadFile=f;
               await guardarF(fNC, true);
@@ -2399,12 +2447,24 @@ function setEditTipo(t){
   editTipo=t;
   const colors={venda:'#27ae60',compra:'#2980b9',nota_credito:'#e67e22'};
   ['venda','compra','nota_credito'].forEach(x=>{
-    const btn=document.getElementById('ef_tipo_'+x.replace('_','_'));
+    const btn=document.getElementById('ef_tipo_'+x);
     if(!btn)return;
     const active=x===t;
     btn.style.background=active?colors[x]:'';
     btn.style.color=active?'#fff':'';
     btn.style.borderColor=active?colors[x]:'';
+  });
+  const ncRow=document.getElementById('ef_nc_tipo_row');
+  if(ncRow)ncRow.style.display=t==='nota_credito'?'':'none';
+}
+
+function setEditNcTipo(t){
+  editNcTipo=t;
+  ['venda','compra'].forEach(x=>{
+    const btn=document.getElementById('ef_nct_'+x);
+    if(!btn)return;
+    btn.style.background=x===t?'#e67e22':'';
+    btn.style.color=x===t?'#fff':'';
   });
 }
 
