@@ -887,6 +887,13 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
       <span style="font-size:.76rem;color:var(--muted)">Valor do campo 96 da declaração anterior</span>
     </div>
 
+    <div id="seqAviso" class="info-box gold" style="display:none;margin-bottom:.8rem"></div>
+    <div style="margin-bottom:1.1rem;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('efaturaCsv').click()">🔎 Comparar com e-fatura (CSV)</button>
+      <input type="file" id="efaturaCsv" accept=".csv,text/csv,text/plain" style="display:none" onchange="compararEfatura(this.files[0]);this.value=''" />
+      <span style="font-size:.74rem;color:var(--muted)">Exporta as faturas emitidas no e-fatura e carrega o CSV para ver se falta alguma na app</span>
+    </div>
+
     <div class="decl-layout">
       <div>
         <!-- Q06 VENDAS -->
@@ -1515,7 +1522,7 @@ function mostrarLinkDoc(url){
   const d=document.createElement('div');
   d.id='docLinkOverlay';
   d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.2rem';
-  d.innerHTML=`<div style="background:var(--card);border-radius:14px;padding:1.5rem 1.4rem;max-width:310px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3)">
+  d.innerHTML=`<div style="background:var(--surface);border-radius:14px;padding:1.5rem 1.4rem;max-width:310px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3)">
     <div style="font-size:2rem;margin-bottom:.5rem">📎</div>
     <div style="font-weight:700;font-size:1rem;margin-bottom:.8rem">Abrir ficheiro original</div>
     <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:block;background:var(--blue);color:#fff;padding:.85rem 1rem;border-radius:9px;text-decoration:none;font-weight:700;font-size:.92rem;margin-bottom:.7rem">📄 Abrir PDF</a>
@@ -1727,6 +1734,7 @@ function calcular(){
   sf('d33',cit+ci22_ext,(cit+ci22_ext)===0,'g');
   sf('d61',c61,false,'g'); sf('d65',c65,false,'g'); sf('d67',c67,c67===0,'g');
   sf('d91',c65+c67,(c65+c67)===0,'g');
+  verificarSequencia(ano,trim);
   ultimoApuramento={ano,trim,vb5,vi5,vb12,vi12,vb22,vi22,vis,vbe,vie,vbt,vit,dedutivel:cit+ci22_ext,c96,resultado};
 
   if(resultado>=0){
@@ -1766,6 +1774,129 @@ function calcular(){
 // ══════════════════════════════════════════════════
 // PDF
 // ══════════════════════════════════════════════════
+// Série + número de uma fatura (ex.: "FR 2026218988338AL/0042" → 2026218988338AL / 42)
+function chaveFatura(num){
+  const m=String(num||'').toUpperCase().match(/(?:\b([A-Z]{1,4})\s+)?([A-Z0-9]+)\s*\/\s*0*(\d+)\b/);
+  if(!m) return null;
+  if(!m[1] && !/[A-Z]/.test(m[2])) return null; // evita datas tipo 23/05
+  return {serie:m[2], n:parseInt(m[3],10)};
+}
+const pad4=n=>String(n).padStart(4,'0');
+
+function verificarSequencia(ano,trim){
+  const el=document.getElementById('seqAviso'); if(!el) return;
+  const meses=[trim*3-2,trim*3-1,trim*3];
+  const series={};
+  faturas.forEach(f=>{
+    if(f.perfil_nif!==perfilAtivo.nif||f.tipo!=='venda'||!f.data) return;
+    const p=f.data.split('/'); if(parseInt(p[2])!==ano) return;
+    const k=chaveFatura(f.numero); if(!k) return;
+    (series[k.serie]=series[k.serie]||new Map()).set(k.n,parseInt(p[1]));
+  });
+  const faltas=[];
+  for(const [serie,mapa] of Object.entries(series)){
+    const ns=[...mapa.keys()].sort((a,b)=>a-b);
+    for(let i=1;i<ns.length;i++){
+      const a=ns[i-1], b=ns[i];
+      if(b-a<=1) continue;
+      // só avisa se a falha estiver junto de faturas deste trimestre
+      if(!meses.includes(mapa.get(a)) && !meses.includes(mapa.get(b))) continue;
+      faltas.push(b-a===2 ? `${serie}/${pad4(a+1)}` : `${serie}/${pad4(a+1)} a ${pad4(b-1)}`);
+    }
+  }
+  if(!faltas.length){ el.style.display='none'; return; }
+  el.style.display='';
+  el.innerHTML=`⚠️ <strong>Faltam números na sequência de vendas:</strong> ${faltas.join(', ')}. Carrega essas faturas antes de submeter (ou confirma que foram anuladas).`;
+}
+
+function parseCSV(txt,d){
+  const rows=[]; let row=[], cell='', q=false;
+  for(let i=0;i<txt.length;i++){
+    const c=txt[i];
+    if(q){ if(c==='"'){ if(txt[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=c; }
+    else if(c==='"') q=true;
+    else if(c===d){ row.push(cell); cell=''; }
+    else if(c==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; }
+    else if(c!=='\r') cell+=c;
+  }
+  if(cell||row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.some(x=>x.trim()));
+}
+function dataISO(s){
+  s=String(s||'').trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/); if(m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return null;
+}
+function valorPT(s){
+  s=String(s||'').replace(/[€\s]/g,'');
+  if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.');
+  const v=parseFloat(s); return isNaN(v)?null:v;
+}
+
+async function compararEfatura(file){
+  if(!file) return;
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  const buf=await file.arrayBuffer();
+  let txt=new TextDecoder('utf-8').decode(buf);
+  if(txt.includes('�')) txt=new TextDecoder('windows-1252').decode(buf);
+  txt=txt.replace(/^﻿/,'');
+  const l0=txt.split('\n')[0];
+  const d=[';','\t',','].sort((a,b)=>l0.split(b).length-l0.split(a).length)[0];
+  const rows=parseCSV(txt,d);
+  const hIdx=rows.findIndex(r=>!r.some(c=>chaveFatura(c)) && r.some(c=>/fatura|documento|data/i.test(c)));
+  const hdr=hIdx>=0?rows[hIdx].map(c=>c.trim()):[];
+  const col=re=>hdr.findIndex(c=>re.test(c));
+  const iNum=col(/n\.?[ºo°]?\s*(da\s*)?(fatura|documento)|n[uú]mero/i);
+  const iData=col(/data/i);
+  const iTotal=col(/^total/i);
+
+  const efat=new Map();
+  rows.slice(hIdx+1).forEach(r=>{
+    if(r.some(c=>/anulad/i.test(c))) return;
+    const k=(iNum>=0&&chaveFatura(r[iNum])) || r.map(chaveFatura).find(Boolean);
+    if(!k) return;
+    const dt=(iData>=0&&dataISO(r[iData])) || r.map(dataISO).find(Boolean);
+    efat.set(k.serie+'/'+k.n,{k,data:dt,total:iTotal>=0?valorPT(r[iTotal]):null});
+  });
+  if(!efat.size) return toast('❌ Não encontrei números de fatura neste CSV','error');
+
+  const app=new Map();
+  faturas.filter(f=>f.perfil_nif===perfilAtivo.nif&&f.tipo!=='compra').forEach(f=>{
+    const k=chaveFatura(f.numero); if(k) app.set(k.serie+'/'+k.n,f);
+  });
+  const datas=[...efat.values()].map(x=>x.data).filter(Boolean).sort();
+  const dMin=datas[0], dMax=datas[datas.length-1];
+
+  const emFalta=[...efat.values()].filter(x=>!app.has(x.k.serie+'/'+x.k.n))
+    .sort((a,b)=>(a.data||'').localeCompare(b.data||'')||a.k.n-b.k.n);
+  const aMais=[...app.entries()].filter(([key,f])=>{
+    if(efat.has(key)||f.tipo!=='venda') return false;
+    const di=dataISO(f.data); return di&&dMin&&di>=dMin&&di<=dMax;
+  }).map(([,f])=>f);
+
+  const fmtData=iso=>iso?iso.split('-').reverse().join('/'):'—';
+  const linha=(num,data,total)=>`<tr><td style="padding:.25rem .4rem;font-family:'Syne Mono',monospace">${num}</td><td style="padding:.25rem .4rem">${data}</td><td style="padding:.25rem .4rem;text-align:right">${total!=null?fmt(total):'—'}</td></tr>`;
+  const tabela=linhas=>`<table style="width:100%;border-collapse:collapse;font-size:.78rem;margin:.4rem 0 .9rem">${linhas.join('')}</table>`;
+  const somaFalta=emFalta.reduce((s,x)=>s+(x.total||0),0);
+
+  let html=`<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;margin-bottom:.3rem">🔎 Comparação com e-fatura</div>
+    <div style="font-size:.76rem;color:var(--muted);margin-bottom:.8rem">${efat.size} fatura(s) no CSV · ${fmtData(dMin)} a ${fmtData(dMax)}</div>`;
+  if(!emFalta.length && !aMais.length) html+=`<div class="info-box green" style="margin:0">✅ Está tudo certo: todas as faturas do e-fatura estão na app.</div>`;
+  if(emFalta.length) html+=`<div style="font-weight:700;color:var(--danger);font-size:.84rem">❌ Faltam na app: ${emFalta.length}${somaFalta?` (${fmt(somaFalta)})`:''}</div>`
+    + tabela(emFalta.map(x=>linha(`${x.k.serie}/${pad4(x.k.n)}`,fmtData(x.data),x.total)));
+  if(aMais.length) html+=`<div style="font-weight:700;color:var(--gold);font-size:.84rem">⚠️ Na app mas não no e-fatura: ${aMais.length}</div>`
+    + tabela(aMais.map(f=>{const k=chaveFatura(f.numero);return linha(`${k.serie}/${pad4(k.n)}`,fmtData(dataISO(f.data)),+f.total);}));
+
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  o.innerHTML=`<div style="background:var(--surface);border-radius:14px;padding:1.2rem;max-width:520px;width:100%;max-height:85vh;overflow:auto">${html}
+    <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:.4rem">Fechar</button></div>`;
+  o.querySelector('button').addEventListener('click',()=>o.remove());
+  o.addEventListener('click',e=>{if(e.target===o)o.remove();});
+  document.body.appendChild(o);
+}
+
 // Prazos de entrega DP IVA trimestral (fonte: calendário AT)
 const PRAZOS_DP={'2025-4':'2026-02-20','2026-1':'2026-05-22','2026-2':'2026-09-20','2026-3':'2026-11-20'};
 function prazoEntregaDP(ano,trim){
