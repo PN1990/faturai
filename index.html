@@ -1505,7 +1505,8 @@ async function uploadToStorage(file, fatura){
     if(fatura.id) await sb.from('faturas').update({storage_path:path}).eq('id',fatura.id);
   }catch(e){console.warn('Storage:',e.message);}
 }
-async function downloadFaturaDoc(id, path){
+async function downloadFaturaDoc(id){
+  const path=faturas.find(f=>f.id===id)?.storage_path;
   if(!path){toast('⚠️ Ficheiro não disponível — foi extraído antes de esta funcionalidade existir','error');return;}
   showLoader('A obter ficheiro…');
   try{
@@ -1626,7 +1627,7 @@ function renderFaturas(){
     <td class="mono">${(f.prestacoes||0)>0?'<span style="color:var(--gold);font-weight:700">'+fmt(f.prestacoes)+'</span>':'<span style="color:var(--muted)">—</span>'}</td>
     <td class="mono"><strong>${fmt(f.total)}</strong></td>
     <td style="white-space:nowrap">
-      ${f.storage_path?`<button class="btn btn-sm" style="background:rgba(52,152,219,.12);color:var(--blue);border:none;margin-right:.2rem" title="Descarregar ficheiro original" onclick="downloadFaturaDoc(${f.id},${JSON.stringify(f.storage_path)})">📎</button>`:''}
+      ${f.storage_path?`<button class="btn btn-sm" style="background:rgba(52,152,219,.12);color:var(--blue);border:none;margin-right:.2rem" title="Descarregar ficheiro original" onclick="downloadFaturaDoc(${f.id})">📎</button>`:''}
       <button class="btn btn-sm" style="background:var(--gold-light);color:var(--gold);border:none;margin-right:.2rem" onclick="abrirEdicao(${f.id})">✏️</button>
       <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:none" onclick="delFatura(${f.id})">✕</button>
     </td>
