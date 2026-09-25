@@ -796,10 +796,14 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <!-- PANE: E-FATURA -->
         <div class="upload-pane" id="pane-efatura">
           <div class="info-box green" style="margin-bottom:.85rem;font-size:.74rem">
-            No <strong>e-fatura</strong>, vai a Faturas → <strong>Emitidas</strong>, filtra o período e exporta em CSV. Carrega o ficheiro aqui para ver as faturas de venda que faltam na app e adicioná-las.
+            No <strong>e-fatura</strong>, filtra o período e exporta em CSV: <strong>Emitidas</strong> para as vendas, <strong>Recebidas</strong> (como adquirente) para as compras. A app mostra as que faltam e tu escolhes quais adicionar.
           </div>
           <input type="file" id="efaturaImportCsv" accept=".csv,text/csv,text/plain" style="display:none" onchange="importarEfatura(this.files[0]);this.value=''" />
-          <button class="btn btn-primary" onclick="document.getElementById('efaturaImportCsv').click()">📥 Carregar CSV do e-fatura</button>
+          <input type="file" id="efaturaComprasCsv" accept=".csv,text/csv,text/plain" style="display:none" onchange="importarComprasEfatura(this.files[0]);this.value=''" />
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="document.getElementById('efaturaImportCsv').click()">📤 Vendas (faturas emitidas)</button>
+            <button class="btn btn-outline" onclick="document.getElementById('efaturaComprasCsv').click()">📥 Compras (faturas recebidas)</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1867,17 +1871,22 @@ function valorPT(s){
   const v=parseFloat(s); return isNaN(v)?null:v;
 }
 
-async function lerCsvEfatura(file){
+async function lerTabelaCsv(file){
   const buf=await file.arrayBuffer();
   let txt=new TextDecoder('utf-8').decode(buf);
-  if(txt.includes('�')) txt=new TextDecoder('windows-1252').decode(buf);
-  txt=txt.replace(/^﻿/,'');
+  if(txt.includes('\uFFFD')) txt=new TextDecoder('windows-1252').decode(buf);
+  txt=txt.replace(/^\uFEFF/,'');
   const l0=txt.split('\n')[0];
   const d=[';','\t',','].sort((a,b)=>l0.split(b).length-l0.split(a).length)[0];
   const rows=parseCSV(txt,d);
   const hIdx=rows.findIndex(r=>!r.some(c=>chaveFatura(c)) && r.some(c=>/fatura|documento|data/i.test(c)));
   const hdr=hIdx>=0?rows[hIdx].map(c=>c.trim()):[];
   const col=re=>hdr.findIndex(c=>re.test(c));
+  return {rows,hIdx,hdr,col};
+}
+
+async function lerCsvEfatura(file){
+  const {rows,hIdx,hdr,col}=await lerTabelaCsv(file);
   const iNum=col(/n\.?[ºo°]?\s*(da\s*)?(fatura|documento)|n[uú]mero/i);
   const iData=col(/data/i);
   const iTotal=col(/^total/i);
@@ -1921,6 +1930,7 @@ function csvDoutroPerfil(nifsCsv,efat){
     if(outro&&conta(perfilAtivo.nif)===0) nifsCsv.add(outro);
   }
   if(!nifsCsv.size||nifsCsv.has(String(perfilAtivo.nif))) return false;
+  if(nifsCsv.size>1){ toast('❌ Este CSV tem vários emitentes — parece ser de faturas recebidas. Usa Faturas → 📥 e-fatura → 📥 Compras.','error'); return true; }
   toast(`❌ Este CSV é do NIF ${[...nifsCsv].join(', ')}, mas o perfil ativo é ${perfilAtivo.nif}. Muda de perfil primeiro.`,'error');
   return true;
 }
@@ -1991,7 +2001,20 @@ function abrirOverlay(html){
   return o;
 }
 
-// Converte uma linha do e-fatura numa fatura da app (taxa deduzida de IVA/base)
+// Põe base/IVA no escalão da taxa mais próxima. Vendas (Madeira): 4/12/22 e base só a parte tributada.
+// Compras: aceita também taxas do continente (6/13/23) e mantém a base (só o IVA conta para dedução).
+function distribuirIva(f,base,iva,compra){
+  if(iva===0){ f.base_isenta=base; return ''; }
+  const r=base?iva/base:0;
+  const taxas=compra?[0.04,0.05,0.06,0.12,0.13,0.22,0.23]:[0.04,0.12,0.22];
+  const taxa=taxas.reduce((a,b)=>Math.abs(b-r)<Math.abs(a-r)?b:a);
+  const suf=taxa<0.1?'5':taxa<0.2?'12':'22';
+  f['iva_'+suf]=iva;
+  f['base_'+suf]=+(compra ? (base||iva/taxa) : (base && iva>=base*taxa-0.02 ? base : iva/taxa)).toFixed(2);
+  return Math.abs(r-taxa)>0.005 ? (compra?'taxas mistas ':'taxa ')+(r*100).toFixed(1)+'%' : '';
+}
+
+// Converte uma linha do e-fatura (emitidas) numa fatura da app
 function faturaDeEfatura(x){
   const base=Math.abs(x.base||0), iva=Math.abs(x.iva||0), total=Math.abs(x.total||0);
   const f={tipo:x.nc?'nota_credito':'venda', nc_tipo:x.nc?'venda':null, perfil_nif:perfilAtivo.nif,
@@ -2002,18 +2025,104 @@ function faturaDeEfatura(x){
     base_5:0,iva_5:0,base_12:0,iva_12:0,base_22:0,iva_22:0,base_isenta:0,
     base_estrangeira:0,iva_estrangeira:0,total:total||+(base+iva).toFixed(2),
     prestacoes:0, ficheiro:'e-fatura', nota:'Importada do e-fatura'+(x.adquirente?' · '+x.adquirente:'')};
-  let aviso='';
-  if(iva===0){ f.base_isenta=base; }
-  else{
-    const r=base?iva/base:0;
-    const taxa=[0.04,0.12,0.22].reduce((a,b)=>Math.abs(b-r)<Math.abs(a-r)?b:a);
-    const suf={0.04:'5',0.12:'12',0.22:'22'}[taxa];
-    f['iva_'+suf]=iva;
-    f['base_'+suf]=+(base && iva>=base*taxa-0.02 ? base : iva/taxa).toFixed(2);
-    if(Math.abs(r-taxa)>0.005) aviso='taxa '+(r*100).toFixed(1)+'%';
-  }
+  const aviso=distribuirIva(f,base,iva,false);
   recalcTotais(f);
   return {f,aviso};
+}
+
+// ── Compras: CSV de faturas RECEBIDAS do e-fatura ──
+async function lerCsvRecebidas(file){
+  const {rows,hIdx,col}=await lerTabelaCsv(file);
+  const iNum=col(/n\.?[ºo°]?\s*(da\s*)?(fatura|documento)|n[uú]mero/i);
+  const iData=col(/data/i), iTotal=col(/^total/i), iBase=col(/base/i), iTipo=col(/^tipo/i);
+  const iIva=(rows[hIdx]||[]).findIndex(c=>/\biva\b/i.test(c)&&!/base|total|taxa/i.test(c));
+  const iEmit=col(/emitente|fornecedor/i), iAdq=col(/adquirente/i);
+  if(iEmit<0) return {erro:'O CSV não tem a coluna do emitente (fornecedor).'};
+  const itens=[], nifsAdq=new Set();
+  rows.slice(hIdx+1).forEach(r=>{
+    if(r.some(c=>/anulad/i.test(c))) return;
+    const cel=(iNum>=0?r[iNum]:r.find(c=>chaveFatura(c)))||'';
+    const numRaw=cel.split(/\s+\/\s+/)[0].replace(/[<>&"'`]/g,'').trim();
+    const emit=r[iEmit]||'';
+    const nif=(emit.match(/\b\d{9}\b/)||[])[0];
+    if(!numRaw||!nif) return;
+    if(iAdq>=0){ const a=(r[iAdq].match(/\b\d{9}\b/)||[])[0]; if(a) nifsAdq.add(a); }
+    const tipoDoc=iTipo>=0?r[iTipo]:'';
+    itens.push({nif, numRaw, k:chaveFatura(numRaw),
+      nome:emit.replace(/^\s*\d{9}\s*-?\s*/,'').replace(/[<>&"'`]/g,'').trim()||nif,
+      data:(iData>=0&&dataISO(r[iData])) || r.map(dataISO).find(Boolean),
+      total:iTotal>=0?valorPT(r[iTotal]):null, base:iBase>=0?valorPT(r[iBase]):null, iva:iIva>=0?valorPT(r[iIva]):null,
+      nc:/cr[eé]dito/i.test(tipoDoc)||/^NC\b/i.test(numRaw)});
+  });
+  return {itens, nifsAdq, nifsEmit:new Set(itens.map(x=>x.nif)), temValores:iBase>=0&&iIva>=0};
+}
+const normNumero=s=>String(s||'').replace(/\s+/g,'').toUpperCase().replace(/^0+/,'');
+function compraNaApp(x){
+  return faturas.find(f=>{
+    if(f.perfil_nif!==perfilAtivo.nif||f.estrangeira) return false;
+    if(!(f.tipo==='compra'||(f.tipo==='nota_credito'&&f.nc_tipo==='compra'))) return false;
+    if(normNif(f.nif)!==x.nif) return false;
+    if(normNumero(f.numero)===normNumero(x.numRaw)) return true;
+    const kf=chaveFatura(f.numero);
+    return !!(kf&&x.k&&mesmaFatura(kf,x.k));
+  });
+}
+function faturaDeCompra(x){
+  const base=Math.abs(x.base||0), iva=Math.abs(x.iva||0), total=Math.abs(x.total||0);
+  const f={tipo:x.nc?'nota_credito':'compra', nc_tipo:x.nc?'compra':null, perfil_nif:perfilAtivo.nif,
+    fornecedor:x.nome, nif:x.nif, numero:x.numRaw,
+    data:x.data?x.data.split('-').reverse().join('/'):'',
+    isenta:iva===0, estrangeira:false, pais_origem:null,
+    base_5:0,iva_5:0,base_12:0,iva_12:0,base_22:0,iva_22:0,base_isenta:0,
+    base_estrangeira:0,iva_estrangeira:0,total:total||+(base+iva).toFixed(2),
+    prestacoes:0, ficheiro:'e-fatura', nota:'Importada do e-fatura'};
+  const aviso=distribuirIva(f,base,iva,true);
+  recalcTotais(f);
+  return {f,aviso};
+}
+async function importarComprasEfatura(file){
+  if(!file) return;
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  const r=await lerCsvRecebidas(file);
+  if(r.erro) return toast('❌ '+r.erro,'error');
+  const {itens,nifsAdq,nifsEmit,temValores}=r;
+  if(!itens.length) return toast('❌ Não encontrei faturas neste CSV','error');
+  const meu=String(perfilAtivo.nif);
+  if(nifsEmit.size===1&&nifsEmit.has(meu)) return toast('❌ Este CSV é de faturas emitidas (vendas). Usa o botão 📤 Vendas.','error');
+  if(nifsAdq.size&&!nifsAdq.has(meu)) return toast(`❌ Este CSV é do NIF ${[...nifsAdq].join(', ')}, mas o perfil ativo é ${meu}. Muda de perfil primeiro.`,'error');
+  if(!temValores) return toast('❌ O CSV não tem colunas de base e IVA — não dá para importar','error');
+  const novas=itens.filter(x=>!compraNaApp(x))
+    .sort((a,b)=>(a.data||'').localeCompare(b.data||''))
+    .map(faturaDeCompra);
+  if(!novas.length) return toast(`✅ As ${itens.length} faturas recebidas já estão todas na app`,'success');
+
+  const td='padding:.3rem .35rem;border-bottom:1px solid var(--border)';
+  const linhas=novas.map(({f,aviso},i)=>{
+    const iv=f.iva_5+f.iva_12+f.iva_22;
+    return `<tr><td style="${td}"><input type="checkbox" data-i="${i}"></td>
+      <td style="${td}">${f.tipo==='nota_credito'?'↩️ ':''}${f.fornecedor}<br><span style="color:var(--muted);font-family:'Syne Mono',monospace;font-size:.7rem">${f.numero.replace(/[<>&"'`]/g,'')}</span></td>
+      <td style="${td}">${f.data}</td><td style="${td};text-align:right">${fmt(f.total)}</td>
+      <td style="${td};text-align:right">${fmt(iv)}${aviso?`<br><span style="color:var(--gold);font-size:.68rem">⚠️ ${aviso}</span>`:''}</td></tr>`;
+  }).join('');
+  const o=abrirOverlay(`<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;margin-bottom:.3rem">📥 Compras em falta (${novas.length} de ${itens.length})</div>
+    <div class="info-box gold" style="margin:0 0 .6rem;font-size:.72rem">⚠️ O e-fatura mostra <strong>todas</strong> as faturas com o teu NIF, incluindo despesas pessoais. Marca só as despesas da atividade — as pessoais não dão direito a deduzir IVA.</div>
+    <table style="width:100%;border-collapse:collapse;font-size:.74rem"><tr style="color:var(--muted);text-align:left"><th><input type="checkbox" data-todas title="Marcar todas"></th><th>Fornecedor</th><th>Data</th><th style="text-align:right">Total</th><th style="text-align:right">IVA</th></tr>${linhas}</table>
+    <button class="btn btn-primary" data-importar style="width:100%;justify-content:center;margin-top:.8rem">➕ Adicionar selecionadas</button>`);
+  const todas=o.querySelector('[data-todas]');
+  if(todas&&todas.addEventListener) todas.addEventListener('change',()=>o.querySelectorAll('input[data-i]').forEach(c=>c.checked=todas.checked));
+  o.querySelector('[data-importar]').addEventListener('click',async()=>{
+    const escolhidas=[...o.querySelectorAll('input[data-i]:checked')].map(c=>novas[+c.dataset.i].f);
+    if(!escolhidas.length) return toast('⚠️ Nenhuma fatura selecionada','error');
+    o.remove();
+    showLoader(`A adicionar ${escolhidas.length} compra(s)…`);
+    let ok=0, fail=0;
+    for(const f of escolhidas){
+      try{ faturas.unshift(await sbInsert(f)); ok++; }catch(e){ fail++; }
+    }
+    hideLoader();
+    renderFaturas(); calcular();
+    toast(`✅ ${ok} compra(s) adicionada(s)`+(fail?` · ❌ ${fail} erro(s)`:''),fail?'error':'success');
+  });
 }
 
 async function importarEfatura(file){
