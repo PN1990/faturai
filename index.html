@@ -573,17 +573,17 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
 <!-- MODAL: IMPORTAR BACKUP -->
 <div class="overlay" id="modalImport">
   <div class="modal" style="width:480px">
-    <div class="modal-hd" style="background:var(--blue)"><div class="modal-title">📥 Importar CSV de Backup</div></div>
+    <div class="modal-hd" style="background:var(--blue)"><div class="modal-title">📥 Restaurar Backup</div></div>
     <div class="modal-body">
       <div class="info-box blue" style="margin-bottom:.85rem">
-        Importa um CSV exportado pelo <strong>💾 Backup</strong>.<br>
+        Importa o ZIP (ou CSV) criado pelo <strong>💾 Backup</strong>. Os PDFs/fotos do ZIP também são repostos.<br>
         Faturas já existentes são ignoradas automaticamente (por NIF + número).
       </div>
       <div class="drop-zone" style="min-height:90px;margin-bottom:.85rem;position:relative">
-        <input type="file" id="importFileInput" accept=".csv" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" />
+        <input type="file" id="importFileInput" accept=".zip,.csv" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" />
         <div class="drop-icon" id="importIcon">📂</div>
-        <div class="drop-label" id="importLabel">Clica para selecionar o CSV</div>
-        <div class="drop-sub">.csv exportado pelo FaturaAI</div>
+        <div class="drop-label" id="importLabel">Clica para selecionar o backup</div>
+        <div class="drop-sub">.zip ou .csv exportado pelo FaturaAI</div>
       </div>
       <div id="importPreview" style="display:none">
         <div class="info-box green" id="importInfo"></div>
@@ -2377,6 +2377,25 @@ function exportModelo30XML(){
 // ══════════════════════════════════════════════════
 // BACKUP COMPLETO
 // ══════════════════════════════════════════════════
+const BACKUP_COLS=['id','perfil_nif','tipo','nc_tipo','estrangeira','fornecedor','nif','numero','data',
+  'base_5','iva_5','base_12','iva_12','base_22','iva_22','base_isenta',
+  'base_estrangeira','iva_estrangeira','base_total','iva_total','total',
+  'prestacoes','isenta','pais_origem','ficheiro','created_at','nota','storage_path'];
+
+function carregarScript(src){
+  return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=ko;document.head.appendChild(s);});
+}
+async function obterJSZip(){
+  if(!window.JSZip) await carregarScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  return window.JSZip;
+}
+function baixarBlob(blob,nome){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=nome;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+// Backup: ZIP com o CSV de todas as faturas + os PDFs/fotos originais (ficheiros/<caminho no Storage>)
 async function exportBackup(){
   showLoader('A preparar backup…');
   try{
@@ -2384,20 +2403,117 @@ async function exportBackup(){
     if(error)throw error;
     const list=data||[];
     if(!list.length){hideLoader();return toast('⚠️ Sem faturas para fazer backup','error');}
-    const h=['id','perfil_nif','tipo','nc_tipo','estrangeira','fornecedor','nif','numero','data',
-             'base_5','iva_5','base_12','iva_12','base_22','iva_22','base_isenta',
-             'base_estrangeira','iva_estrangeira','base_total','iva_total','total',
-             'prestacoes','isenta','pais_origem','ficheiro','created_at'];
-    const rows=list.map(f=>h.map(k=>`"${String(f[k]??'').replace(/"/g,'""')}"`));
-    const csv='\uFEFF'+h.join(';')+'\n'+rows.map(r=>r.join(';')).join('\n');
+    const rows=list.map(f=>BACKUP_COLS.map(k=>`"${String(f[k]??'').replace(/"/g,'""')}"`));
+    const csv='﻿'+BACKUP_COLS.join(';')+'\n'+rows.map(r=>r.join(';')).join('\n');
     const now=new Date().toISOString().slice(0,10);
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-    a.download='faturai_backup_'+now+'.csv';
-    a.click();
-    toast('💾 Backup completo — '+list.length+' faturas exportadas!','success');
+    const paths=list.map(f=>f.storage_path).filter(Boolean);
+
+    let JSZip=null;
+    if(paths.length){ try{ JSZip=await obterJSZip(); }catch(e){} }
+    if(!JSZip){
+      baixarBlob(new Blob([csv],{type:'text/csv;charset=utf-8;'}),'faturai_backup_'+now+'.csv');
+      toast('💾 Backup de '+list.length+' faturas (só dados'+(paths.length?' — não foi possível juntar os ficheiros':'')+')','success');
+      return;
+    }
+    const zip=new JSZip();
+    zip.file('faturai_backup_'+now+'.csv',csv);
+    let ok=0, falhas=0;
+    for(let i=0;i<paths.length;i++){
+      document.getElementById('loaderText').textContent=`A juntar ficheiros… ${i+1}/${paths.length}`;
+      const{data:blob,error:e}=await sb.storage.from('faturas-docs').download(paths[i]);
+      if(e||!blob){falhas++;continue;}
+      zip.file('ficheiros/'+paths[i],blob); ok++;
+    }
+    document.getElementById('loaderText').textContent='A criar o ZIP…';
+    baixarBlob(await zip.generateAsync({type:'blob'}),'faturai_backup_'+now+'.zip');
+    toast(`💾 Backup: ${list.length} faturas + ${ok} ficheiro(s)`+(falhas?` · ⚠️ ${falhas} não descarregados`:''),falhas?'error':'success');
   }catch(e){toast('❌ '+e.message,'error');}
   finally{hideLoader();}
+}
+
+// ── Restaurar backup (CSV ou ZIP) ──
+let importPendente=null;
+function abrirImportBackup(){
+  importPendente=null;
+  document.getElementById('importFileInput').value='';
+  document.getElementById('importPreview').style.display='none';
+  document.getElementById('importLabel').textContent='Clica para selecionar o backup';
+  document.getElementById('btnConfirmImport').disabled=true;
+  document.getElementById('modalImport').classList.add('show');
+}
+function linhaBackupParaFatura(o){
+  const num=k=>{const v=parseFloat(String(o[k]??'').replace(',','.'));return isNaN(v)?0:v;};
+  const txt=k=>{const v=String(o[k]??'').trim();return v===''?null:v;};
+  const f={
+    perfil_nif:txt('perfil_nif'), tipo:txt('tipo')||'compra', nc_tipo:txt('nc_tipo'),
+    estrangeira:o.estrangeira==='true', isenta:o.isenta==='true',
+    fornecedor:txt('fornecedor')||'—', nif:txt('nif')||'—', numero:txt('numero')||'—', data:txt('data')||'—',
+    pais_origem:txt('pais_origem'), ficheiro:txt('ficheiro'), nota:txt('nota'), storage_path:txt('storage_path')
+  };
+  ['base_5','iva_5','base_12','iva_12','base_22','iva_22','base_isenta','base_estrangeira','iva_estrangeira',
+   'base_total','iva_total','total','prestacoes'].forEach(k=>f[k]=num(k));
+  return f;
+}
+async function lerBackup(file){
+  let csvTxt, zip=null;
+  if(/\.zip$/i.test(file.name)){
+    zip=await (await obterJSZip()).loadAsync(file);
+    const csvEntry=Object.values(zip.files).find(z=>!z.dir&&/\.csv$/i.test(z.name)&&!z.name.startsWith('ficheiros/'));
+    if(!csvEntry) throw new Error('O ZIP não tem o CSV do backup');
+    csvTxt=await csvEntry.async('string');
+  } else csvTxt=await file.text();
+  const rows=parseCSV(csvTxt.replace(/^﻿/,''),';');
+  const hdr=(rows[0]||[]).map(h=>h.trim());
+  if(!hdr.includes('perfil_nif')||!hdr.includes('numero')) throw new Error('Não é um backup do FaturaAI');
+  const lista=rows.slice(1).map(r=>linhaBackupParaFatura(Object.fromEntries(hdr.map((h,i)=>[h,r[i]]))));
+  const norm=s=>String(s||'').replace(/\s+/g,'').toUpperCase();
+  const existe=f=>faturas.some(x=>x.perfil_nif===f.perfil_nif&&normNif(x.nif)===normNif(f.nif)&&norm(x.numero)===norm(f.numero));
+  const novas=lista.filter(f=>f.perfil_nif&&!existe(f));
+  return {lista,novas,zip};
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const inp=document.getElementById('importFileInput');
+  if(!inp) return;
+  inp.addEventListener('change',async()=>{
+    const file=inp.files[0]; if(!file) return;
+    document.getElementById('importLabel').textContent=file.name;
+    showLoader('A ler backup…');
+    try{
+      importPendente=await lerBackup(file);
+      const {lista,novas,zip}=importPendente;
+      const nFich=zip?Object.keys(zip.files).filter(n=>n.startsWith('ficheiros/')&&!zip.files[n].dir).length:0;
+      document.getElementById('importInfo').innerHTML=`${lista.length} fatura(s) no backup · <strong>${novas.length} nova(s)</strong> · ${lista.length-novas.length} já existem (ignoradas)`+(zip?`<br>${nFich} ficheiro(s) PDF/foto no ZIP`:'');
+      document.getElementById('importPreview').style.display='';
+      document.getElementById('btnConfirmImport').disabled=!novas.length;
+    }catch(e){ importPendente=null; toast('❌ '+e.message,'error'); }
+    finally{ hideLoader(); }
+  });
+});
+async function confirmarImport(){
+  if(!importPendente) return;
+  const {novas,zip}=importPendente;
+  fecharModal('modalImport');
+  showLoader(`A importar ${novas.length} fatura(s)…`);
+  let ok=0, fail=0, fich=0;
+  for(const f of novas){
+    const path=f.storage_path;
+    const entrada=path&&zip?zip.file('ficheiros/'+path):null;
+    if(path&&!entrada) f.storage_path=null;
+    try{
+      const saved=await sbInsert(f);
+      faturas.unshift(saved); ok++;
+      if(entrada){
+        const blob=await entrada.async('blob');
+        const tipo=/\.pdf$/i.test(path)?'application/pdf':/\.png$/i.test(path)?'image/png':/\.(jpe?g)$/i.test(path)?'image/jpeg':undefined;
+        const{error}=await sb.storage.from('faturas-docs').upload(path,blob,{upsert:false,contentType:tipo});
+        if(!error||/exists/i.test(error.message||'')) fich++;
+      }
+    }catch(e){ fail++; }
+  }
+  importPendente=null;
+  hideLoader();
+  renderFaturas(); calcular();
+  toast(`📥 ${ok} fatura(s) importada(s)`+(fich?` · ${fich} ficheiro(s)`:'')+(fail?` · ❌ ${fail} erro(s)`:''),fail?'error':'success');
 }
 
 
