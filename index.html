@@ -739,6 +739,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         <div class="upload-tabs">
           <button class="upload-tab active" onclick="showUploadTab('batch',this)">✦ IA</button>
           <button class="upload-tab" onclick="showUploadTab('manual',this)">✏️ Manual</button>
+          <button class="upload-tab" onclick="showUploadTab('efatura',this)">📥 e-fatura</button>
         </div>
 
         <!-- PANE: IA -->
@@ -790,6 +791,15 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
           </div>
           <div class="info-box green" style="margin-bottom:.85rem;font-size:.74rem">💡 O IVA é calculado automaticamente ao preencher a base.</div>
           <button class="btn btn-primary" onclick="guardarManual()">💾 Guardar Fatura Manual</button>
+        </div>
+
+        <!-- PANE: E-FATURA -->
+        <div class="upload-pane" id="pane-efatura">
+          <div class="info-box green" style="margin-bottom:.85rem;font-size:.74rem">
+            No <strong>e-fatura</strong>, vai a Faturas → <strong>Emitidas</strong>, filtra o período e exporta em CSV. Carrega o ficheiro aqui para ver as faturas de venda que faltam na app e adicioná-las.
+          </div>
+          <input type="file" id="efaturaImportCsv" accept=".csv,text/csv,text/plain" style="display:none" onchange="importarEfatura(this.files[0]);this.value=''" />
+          <button class="btn btn-primary" onclick="document.getElementById('efaturaImportCsv').click()">📥 Carregar CSV do e-fatura</button>
         </div>
       </div>
     </div>
@@ -1299,8 +1309,7 @@ async function extractData(){
       total:+p.total||0,prestacoes:0,ficheiro:file.name
     };
     // Auto-corrigir IVA 4%: a IA pode usar 5% (taxa continental) em vez de 4% (Madeira)
-    if(pendingF.base_5>0 && Math.abs(pendingF.iva_5-pendingF.base_5*0.04)>0.02)
-      pendingF.iva_5=+(pendingF.base_5*0.04).toFixed(2);
+    ajustarIva4(pendingF);
     recalcTotais(pendingF);
     pendingLinhas=p.linhas_suspeitas||[];
     pendingUploadFile=file; // para upload ao Supabase Storage quando guardarF correr
@@ -1639,23 +1648,28 @@ async function delFatura(id){
   try{await sbDelete(id);faturas=faturas.filter(f=>f.id!==id);renderFaturas();calcular();toast('🗑 Apagada','info')}
   catch(e){toast('❌ '+e.message,'error')}
 }
+// IVA acima de 4% da base = IA usou a taxa errada; abaixo = parte da base não sujeita a IVA (ex.: taxa turística)
+function ajustarIva4(f){
+  const b=+f.base_5||0, i=+f.iva_5||0;
+  if(b<=0) return false;
+  const esp=b*0.04;
+  if(i>0 && i<esp-0.02){ f.base_5=+(i/0.04).toFixed(2); return true; }
+  if(Math.abs(i-esp)>0.02){ f.iva_5=+esp.toFixed(2); return true; }
+  return false;
+}
 async function corrigirIva4(){
   if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
-  const alvos = faturas.filter(f=>
-    f.perfil_nif===perfilAtivo.nif &&
-    f.base_5>0 &&
-    Math.abs((+f.iva_5||0) - f.base_5*0.04) > 0.02
-  );
+  const alvos = faturas.filter(f=>f.perfil_nif===perfilAtivo.nif && ajustarIva4({...f}));
   if(alvos.length===0){ toast('✅ Nenhuma fatura com IVA 4% incorreto!','success'); return; }
-  if(!confirm(`Corrigir IVA 4% em ${alvos.length} fatura(s)?\n\nO IVA será recalculado como base×4%.`)) return;
+  if(!confirm(`Corrigir IVA 4% em ${alvos.length} fatura(s)?\n\nSe o IVA estiver acima de 4% da base, é recalculado. Se estiver abaixo, a base passa a ser só a parte sujeita a IVA.`)) return;
   showLoader(`A corrigir ${alvos.length} fatura(s)…`);
   let ok=0, fail=0;
   for(const f of alvos){
     try{
-      const iva5=+(f.base_5*0.04).toFixed(2);
-      await sbUpdate(f.id,{iva_5:iva5});
-      f.iva_5=iva5;
-      f.iva_total=(+f.iva_5||0)+(+f.iva_12||0)+(+f.iva_22||0);
+      const n={...f}; ajustarIva4(n);
+      const iva_total=+((+n.iva_5||0)+(+n.iva_12||0)+(+n.iva_22||0)).toFixed(2);
+      await sbUpdate(f.id,{base_5:n.base_5,iva_5:n.iva_5,iva_total});
+      Object.assign(f,{base_5:n.base_5,iva_5:n.iva_5,iva_total});
       ok++;
     }catch(e){ fail++; }
   }
@@ -1780,7 +1794,8 @@ function chaveFatura(num){
   const m=String(num||'').toUpperCase().match(/(?:\b([A-Z]{1,4})\s+)?([A-Z0-9]+)\s*\/\s*0*(\d+)\b/);
   if(!m) return null;
   if(!m[1] && !/[A-Z]/.test(m[2])) return null; // evita datas tipo 23/05
-  return {serie:m[2], n:parseInt(m[3],10)};
+  const nc=m[1]==='NC'||m[1]==='ND';
+  return {serie:(nc?m[1]+' ':'')+m[2], n:parseInt(m[3],10)};
 }
 const pad4=n=>String(n).padStart(4,'0');
 
@@ -1835,9 +1850,7 @@ function valorPT(s){
   const v=parseFloat(s); return isNaN(v)?null:v;
 }
 
-async function compararEfatura(file){
-  if(!file) return;
-  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+async function lerCsvEfatura(file){
   const buf=await file.arrayBuffer();
   let txt=new TextDecoder('utf-8').decode(buf);
   if(txt.includes('�')) txt=new TextDecoder('windows-1252').decode(buf);
@@ -1851,6 +1864,10 @@ async function compararEfatura(file){
   const iNum=col(/n\.?[ºo°]?\s*(da\s*)?(fatura|documento)|n[uú]mero/i);
   const iData=col(/data/i);
   const iTotal=col(/^total/i);
+  const iBase=col(/base/i);
+  const iIva=hdr.findIndex(c=>/\biva\b/i.test(c)&&!/base|total|taxa/i.test(c));
+  const iTipo=col(/^tipo/i);
+  const iAdq=col(/adquirente|cliente/i);
 
   const efat=new Map();
   rows.slice(hIdx+1).forEach(r=>{
@@ -1858,16 +1875,34 @@ async function compararEfatura(file){
     const k=(iNum>=0&&chaveFatura(r[iNum])) || r.map(chaveFatura).find(Boolean);
     if(!k) return;
     const dt=(iData>=0&&dataISO(r[iData])) || r.map(dataISO).find(Boolean);
-    efat.set(k.serie+'/'+k.n,{k,data:dt,total:iTotal>=0?valorPT(r[iTotal]):null});
+    const tipoDoc=iTipo>=0?r[iTipo].trim():'';
+    const numTxt=(iNum>=0?r[iNum]:r.find(c=>chaveFatura(c)))||'';
+    const pref=(numTxt.toUpperCase().match(/\b([A-Z]{1,4})\s+[A-Z0-9]+\s*\//)||[])[1]||'';
+    efat.set(k.serie+'/'+k.n,{k,data:dt,
+      total:iTotal>=0?valorPT(r[iTotal]):null,
+      base:iBase>=0?valorPT(r[iBase]):null,
+      iva:iIva>=0?valorPT(r[iIva]):null,
+      nc:/cr[eé]dito/i.test(tipoDoc)||pref==='NC',
+      pref, adquirente:iAdq>=0?r[iAdq].replace(/[<>&"'`]/g,'').trim():''});
   });
-  if(!efat.size) return toast('❌ Não encontrei números de fatura neste CSV','error');
-
+  const datas=[...efat.values()].map(x=>x.data).filter(Boolean).sort();
+  return {efat, dMin:datas[0], dMax:datas[datas.length-1], temValores:iBase>=0&&iIva>=0};
+}
+function mapaAppVendas(){
   const app=new Map();
   faturas.filter(f=>f.perfil_nif===perfilAtivo.nif&&f.tipo!=='compra').forEach(f=>{
     const k=chaveFatura(f.numero); if(k) app.set(k.serie+'/'+k.n,f);
   });
-  const datas=[...efat.values()].map(x=>x.data).filter(Boolean).sort();
-  const dMin=datas[0], dMax=datas[datas.length-1];
+  return app;
+}
+
+async function compararEfatura(file){
+  if(!file) return;
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  const {efat,dMin,dMax}=await lerCsvEfatura(file);
+  if(!efat.size) return toast('❌ Não encontrei números de fatura neste CSV','error');
+
+  const app=mapaAppVendas();
 
   const emFalta=[...efat.values()].filter(x=>!app.has(x.k.serie+'/'+x.k.n))
     .sort((a,b)=>(a.data||'').localeCompare(b.data||'')||a.k.n-b.k.n);
@@ -1883,19 +1918,96 @@ async function compararEfatura(file){
 
   let html=`<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;margin-bottom:.3rem">🔎 Comparação com e-fatura</div>
     <div style="font-size:.76rem;color:var(--muted);margin-bottom:.8rem">${efat.size} fatura(s) no CSV · ${fmtData(dMin)} a ${fmtData(dMax)}</div>`;
-  if(!emFalta.length && !aMais.length) html+=`<div class="info-box green" style="margin:0">✅ Está tudo certo: todas as faturas do e-fatura estão na app.</div>`;
   if(emFalta.length) html+=`<div style="font-weight:700;color:var(--danger);font-size:.84rem">❌ Faltam na app: ${emFalta.length}${somaFalta?` (${fmt(somaFalta)})`:''}</div>`
     + tabela(emFalta.map(x=>linha(`${x.k.serie}/${pad4(x.k.n)}`,fmtData(x.data),x.total)));
   if(aMais.length) html+=`<div style="font-weight:700;color:var(--gold);font-size:.84rem">⚠️ Na app mas não no e-fatura: ${aMais.length}</div>`
     + tabela(aMais.map(f=>{const k=chaveFatura(f.numero);return linha(`${k.serie}/${pad4(k.n)}`,fmtData(dataISO(f.data)),+f.total);}));
+  const difs=[...efat.entries()].filter(([key,x])=>{
+    const f=app.get(key); if(!f||x.iva==null) return false;
+    const ivaApp=(+f.iva_5||0)+(+f.iva_12||0)+(+f.iva_22||0);
+    return Math.abs(Math.abs(ivaApp)-Math.abs(x.iva))>0.02;
+  }).map(([key,x])=>({x,f:app.get(key)}));
+  if(difs.length) html+=`<div style="font-weight:700;color:var(--gold);font-size:.84rem">⚠️ IVA diferente do e-fatura: ${difs.length}</div>`
+    + tabela(difs.map(({x,f})=>`<tr><td style="padding:.25rem .4rem;font-family:'Syne Mono',monospace">${x.k.serie}/${pad4(x.k.n)}</td><td style="padding:.25rem .4rem">app ${fmt((+f.iva_5||0)+(+f.iva_12||0)+(+f.iva_22||0))}</td><td style="padding:.25rem .4rem;text-align:right">e-fatura ${fmt(x.iva)}</td></tr>`));
+  if(!emFalta.length && !aMais.length && !difs.length) html+=`<div class="info-box green" style="margin:0">✅ Está tudo certo: todas as faturas do e-fatura estão na app, com o mesmo IVA.</div>`;
+  if(emFalta.length) html+=`<div class="info-box blue" style="margin:0 0 .6rem;font-size:.74rem">💡 Para adicionar as que faltam, vai a <strong>Faturas → 📥 e-fatura</strong> e carrega o mesmo CSV.</div>`;
+  abrirOverlay(html);
+}
 
+function abrirOverlay(html){
   const o=document.createElement('div');
   o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-  o.innerHTML=`<div style="background:var(--surface);border-radius:14px;padding:1.2rem;max-width:520px;width:100%;max-height:85vh;overflow:auto">${html}
-    <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:.4rem">Fechar</button></div>`;
-  o.querySelector('button').addEventListener('click',()=>o.remove());
+  o.innerHTML=`<div style="background:var(--surface);border-radius:14px;padding:1.2rem;max-width:560px;width:100%;max-height:85vh;overflow:auto">${html}
+    <button class="btn btn-outline" data-fechar style="width:100%;justify-content:center;margin-top:.4rem">Fechar</button></div>`;
+  o.querySelector('[data-fechar]').addEventListener('click',()=>o.remove());
   o.addEventListener('click',e=>{if(e.target===o)o.remove();});
   document.body.appendChild(o);
+  return o;
+}
+
+// Converte uma linha do e-fatura numa fatura da app (taxa deduzida de IVA/base)
+function faturaDeEfatura(x){
+  const base=Math.abs(x.base||0), iva=Math.abs(x.iva||0), total=Math.abs(x.total||0);
+  const f={tipo:x.nc?'nota_credito':'venda', nc_tipo:x.nc?'venda':null, perfil_nif:perfilAtivo.nif,
+    fornecedor:perfilAtivo.nome||'—', nif:'—',
+    numero:`${x.pref&&!x.k.serie.startsWith(x.pref+' ')?x.pref+' ':''}${x.k.serie}/${pad4(x.k.n)}`,
+    data:x.data?x.data.split('-').reverse().join('/'):'',
+    isenta:iva===0, estrangeira:false, pais_origem:null,
+    base_5:0,iva_5:0,base_12:0,iva_12:0,base_22:0,iva_22:0,base_isenta:0,
+    base_estrangeira:0,iva_estrangeira:0,total:total||+(base+iva).toFixed(2),
+    prestacoes:0, ficheiro:'e-fatura', nota:'Importada do e-fatura'+(x.adquirente?' · '+x.adquirente:'')};
+  let aviso='';
+  if(iva===0){ f.base_isenta=base; }
+  else{
+    const r=base?iva/base:0;
+    const taxa=[0.04,0.12,0.22].reduce((a,b)=>Math.abs(b-r)<Math.abs(a-r)?b:a);
+    const suf={0.04:'5',0.12:'12',0.22:'22'}[taxa];
+    f['iva_'+suf]=iva;
+    f['base_'+suf]=+(base && iva>=base*taxa-0.02 ? base : iva/taxa).toFixed(2);
+    if(Math.abs(r-taxa)>0.005) aviso='taxa '+(r*100).toFixed(1)+'%';
+  }
+  recalcTotais(f);
+  return {f,aviso};
+}
+
+async function importarEfatura(file){
+  if(!file) return;
+  if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
+  const {efat,temValores}=await lerCsvEfatura(file);
+  if(!efat.size) return toast('❌ Não encontrei números de fatura neste CSV','error');
+  if(!temValores) return toast('❌ O CSV não tem colunas de base e IVA — não dá para importar','error');
+  const app=mapaAppVendas();
+  const novas=[...efat.values()].filter(x=>!app.has(x.k.serie+'/'+x.k.n))
+    .sort((a,b)=>(a.data||'').localeCompare(b.data||'')||a.k.n-b.k.n)
+    .map(faturaDeEfatura);
+  if(!novas.length) return toast('✅ Todas as faturas do e-fatura já estão na app','success');
+
+  const td='padding:.3rem .35rem;border-bottom:1px solid var(--border)';
+  const linhas=novas.map(({f,aviso},i)=>{
+    const b=f.base_5+f.base_12+f.base_22+f.base_isenta, iv=f.iva_5+f.iva_12+f.iva_22;
+    const taxa=f.base_5?'4%':f.base_12?'12%':f.base_22?'22%':'isenta';
+    return `<tr><td style="${td}"><input type="checkbox" data-i="${i}" checked></td>
+      <td style="${td};font-family:'Syne Mono',monospace">${f.tipo==='nota_credito'?'↩️ ':''}${f.numero}</td>
+      <td style="${td}">${f.data}</td><td style="${td};text-align:right">${fmt(b)}</td>
+      <td style="${td};text-align:right">${fmt(iv)} <span style="color:var(--muted)">${taxa}</span>${aviso?` <span style="color:var(--gold)" title="Confirma a taxa">⚠️ ${aviso}</span>`:''}</td></tr>`;
+  }).join('');
+  const o=abrirOverlay(`<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;margin-bottom:.3rem">📥 Faturas em falta (${novas.length})</div>
+    <div style="font-size:.76rem;color:var(--muted);margin-bottom:.6rem">Estão no e-fatura mas não na app. Confirma os valores e escolhe quais adicionar.</div>
+    <table style="width:100%;border-collapse:collapse;font-size:.76rem"><tr style="color:var(--muted);text-align:left"><th></th><th>Nº</th><th>Data</th><th style="text-align:right">Base</th><th style="text-align:right">IVA</th></tr>${linhas}</table>
+    <button class="btn btn-primary" data-importar style="width:100%;justify-content:center;margin-top:.8rem">➕ Adicionar selecionadas</button>`);
+  o.querySelector('[data-importar]').addEventListener('click',async()=>{
+    const escolhidas=[...o.querySelectorAll('input[data-i]:checked')].map(c=>novas[+c.dataset.i].f);
+    if(!escolhidas.length) return toast('⚠️ Nenhuma fatura selecionada','error');
+    o.remove();
+    showLoader(`A adicionar ${escolhidas.length} fatura(s)…`);
+    let ok=0, fail=0;
+    for(const f of escolhidas){
+      try{ faturas.unshift(await sbInsert(f)); ok++; }catch(e){ fail++; }
+    }
+    hideLoader();
+    renderFaturas(); calcular();
+    toast(`✅ ${ok} fatura(s) adicionada(s)`+(fail?` · ❌ ${fail} erro(s)`:''),fail?'error':'success');
+  });
 }
 
 // Prazos de entrega DP IVA trimestral (fonte: calendário AT)
@@ -2558,8 +2670,7 @@ async function startBatch(){
         total:+p.total||0, prestacoes:0, ficheiro:f.name
       };
       // Auto-corrigir IVA 4%: a IA pode usar 5% (taxa continental) em vez de 4% (Madeira)
-      if(pendingF.base_5>0 && Math.abs(pendingF.iva_5-pendingF.base_5*0.04)>0.02)
-        pendingF.iva_5=+(pendingF.base_5*0.04).toFixed(2);
+      ajustarIva4(pendingF);
       recalcTotais(pendingF);
       pendingLinhas = p.linhas_suspeitas||[];
       pendingUploadFile = f;
@@ -2616,8 +2727,7 @@ async function startBatch(){
                 base_isenta:+nc.base_isenta||0, base_estrangeira:0, iva_estrangeira:0,
                 total:+nc.total||0, prestacoes:0, nota:null, ficheiro:f.name
               };
-              if(fNC.base_5>0 && Math.abs(fNC.iva_5-fNC.base_5*0.04)>0.02)
-                fNC.iva_5=+(fNC.base_5*0.04).toFixed(2);
+              ajustarIva4(fNC);
               recalcTotais(fNC);
               pendingUploadFile=f;
               await guardarF(fNC, true);
