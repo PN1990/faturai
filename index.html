@@ -1930,6 +1930,16 @@ function faturasEmitidasApp(){
     .map(f=>({k:chaveFatura(f.numero),f})).filter(x=>x.k);
 }
 const naApp=(app,k)=>app.find(a=>mesmaFatura(a.k,k))?.f;
+// Regista os trimestres cobertos pelo CSV de vendas (usado no aviso antes do XML)
+async function marcarComparado(dMin,dMax){
+  if(!dMin||!dMax) return;
+  let [y,m]=dMin.split('-').map(Number); const [y2,m2]=dMax.split('-').map(Number);
+  const hoje=new Date().toISOString().slice(0,10);
+  while(y<y2||(y===y2&&m<=m2)){
+    await sbSetConfig(`efat_cmp_${y}_${Math.ceil(m/3)}`,hoje);
+    m+=3-((m-1)%3); if(m>12){m=1;y++;}
+  }
+}
 
 async function compararEfatura(file){
   if(!file) return;
@@ -1938,6 +1948,7 @@ async function compararEfatura(file){
   if(!efat.size) return toast('❌ Não encontrei números de fatura neste CSV','error');
   if(csvDoutroPerfil(nifsCsv,efat)) return;
 
+  marcarComparado(dMin,dMax);
   const app=faturasEmitidasApp();
   const csv=[...efat.values()];
 
@@ -2008,10 +2019,11 @@ function faturaDeEfatura(x){
 async function importarEfatura(file){
   if(!file) return;
   if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
-  const {efat,temValores,nifsCsv}=await lerCsvEfatura(file);
+  const {efat,temValores,nifsCsv,dMin,dMax}=await lerCsvEfatura(file);
   if(!efat.size) return toast('❌ Não encontrei números de fatura neste CSV','error');
   if(csvDoutroPerfil(nifsCsv,efat)) return;
   if(!temValores) return toast('❌ O CSV não tem colunas de base e IVA — não dá para importar','error');
+  marcarComparado(dMin,dMax);
   const app=faturasEmitidasApp();
   const novas=[...efat.values()].filter(x=>!naApp(app,x.k))
     .sort((a,b)=>(a.data||'').localeCompare(b.data||'')||a.k.n-b.k.n)
@@ -2058,11 +2070,16 @@ function prazoEntregaDP(ano,trim){
   return d;
 }
 
-function exportDPIVAXML(){
+async function exportDPIVAXML(){
   if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
   calcular();
   const a=ultimoApuramento;
   if(!a) return;
+  const avisos=[];
+  const seq=document.getElementById('seqAviso');
+  if(seq&&seq.style.display!=='none') avisos.push('• '+seq.textContent.replace(/^⚠️\s*/,'').split('. Carrega')[0]);
+  if(!await sbGetConfig(`efat_cmp_${a.ano}_${a.trim}`,'')) avisos.push('• Ainda não comparaste este trimestre com o CSV do e-fatura (🔎 Comparar com e-fatura).');
+  if(avisos.length && !confirm('Antes de gerar o XML:\n\n'+avisos.join('\n')+'\n\nGerar mesmo assim?')) return;
   if(Math.abs(a.vb12)>0.005||Math.abs(a.vis)>0.005){
     if(!confirm('Este período tem operações a 12% ou isentas, que não vão no XML. Terás de as preencher à mão no Portal AT. Continuar?')) return;
   }
