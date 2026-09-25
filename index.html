@@ -612,7 +612,8 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
       <div class="info-box green" style="margin-bottom:0">Se tens a certeza que é uma fatura diferente, podes guardar na mesma.</div>
     </div>
     <div class="modal-ft">
-      <button class="btn btn-outline btn-sm" onclick="fecharModal('modalDup');pendingF=null;pendingLinhas=[]">Cancelar — é duplicada</button>
+      <button class="btn btn-outline btn-sm" onclick="fecharModal('modalDup');pendingF=null;pendingLinhas=[];pendingUploadFile=null">Cancelar — é duplicada</button>
+      <button class="btn btn-sm" id="btnDupAnexar" style="display:none;background:var(--blue);color:#fff" onclick="anexarADuplicada()">📎 Anexar à existente</button>
       <button class="btn btn-sm" style="background:var(--danger);color:#fff" onclick="fecharModal('modalDup');continuarAposVerificacao()">Guardar mesmo assim</button>
     </div>
   </div>
@@ -1515,8 +1516,14 @@ async function uploadToStorage(file, fatura){
     const{error}=await sb.storage.from('faturas-docs').upload(path,file,{upsert:true,contentType:file.type||'application/pdf'});
     if(error&&error.message!=='The resource already exists'){console.warn('Storage upload:',error.message);return;}
     // Guardar caminho na BD para download posterior
-    if(fatura.id) await sb.from('faturas').update({storage_path:path}).eq('id',fatura.id);
-  }catch(e){console.warn('Storage:',e.message);}
+    if(fatura.id){
+      const{error:eu}=await sb.from('faturas').update({storage_path:path}).eq('id',fatura.id);
+      if(eu){console.warn('Storage path:',eu.message);return null;}
+      fatura.storage_path=path;
+      const loc=faturas.find(x=>x.id===fatura.id); if(loc) loc.storage_path=path;
+    }
+    return path;
+  }catch(e){console.warn('Storage:',e.message);return null;}
 }
 async function downloadFaturaDoc(id){
   const path=faturas.find(f=>f.id===id)?.storage_path;
@@ -2838,7 +2845,7 @@ function checkDuplicado(f){
     if(d) return d;
   }
   if(!f.numero||f.numero==='—'||!f.nif||f.nif==='—') return null;
-  const norm=s=>String(s||'').replace(/\s+/g,'').toUpperCase();
+  const norm=s=>String(s||'').replace(/\s+/g,'').toUpperCase().replace(/^0+/,'');
   return faturas.find(x =>
     x.perfil_nif === f.perfil_nif &&
     normNif(x.nif) === normNif(f.nif) &&
@@ -2852,7 +2859,21 @@ function mostrarAvisoDup(dup, callback){
   document.getElementById('dup_data').textContent = dup.data||'—';
   document.getElementById('dup_total').textContent = fmt(dup.total);
   _afterDupCallback = callback;
+  _dupAtual = dup;
+  document.getElementById('btnDupAnexar').style.display = (pendingUploadFile && !dup.storage_path) ? '' : 'none';
   document.getElementById('modalDup').classList.add('show');
+}
+let _dupAtual = null;
+async function anexarADuplicada(){
+  fecharModal('modalDup');
+  const file=pendingUploadFile, dup=_dupAtual;
+  pendingUploadFile=null; pendingF=null; pendingLinhas=[]; _afterDupCallback=null;
+  if(!file||!dup) return;
+  showLoader('A anexar ficheiro…');
+  const ok=await uploadToStorage(file,dup);
+  hideLoader();
+  renderFaturas();
+  toast(ok?'📎 Ficheiro anexado à fatura existente':'❌ Não foi possível anexar o ficheiro', ok?'success':'error');
 }
 
 async function continuarAposVerificacao(){
@@ -2922,7 +2943,8 @@ async function startBatch(){
   if(batchRunning) return;
   batchRunning = true;
   document.getElementById('btnStartBatch').style.display = 'none';
-  let done=0, errors=0, ignoradas=0;
+  let done=0, errors=0, ignoradas=0, anexados=0;
+  dupBatch={};
   for(let i=0; i<batchFiles.length; i++){
     const f = batchFiles[i];
     const row = document.getElementById('qrow_'+i);
@@ -2994,9 +3016,21 @@ async function startBatch(){
       if(dup){
         row.className='qrow error';
         ico.textContent='⚠️';
-        const fSnap={...pendingF};
-        st.innerHTML='Já existe &nbsp;<button onclick="guardarFaturaBatch(this,'+JSON.stringify(fSnap)+')" style="font-size:.65rem;padding:.15rem .45rem;background:var(--gold);color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:Syne,sans-serif;font-weight:700">Guardar mesmo assim</button>';
-        ignoradas++;
+        pendingUploadFile=null;
+        dupBatch[i]={fatura:{...pendingF},file:f,dup};
+        const mesmoTotal=Math.abs((+dup.total||0)-(+pendingF.total||0))<=0.05;
+        if(!dup.storage_path && mesmoTotal && await uploadToStorage(f,dup)){
+          // mesma fatura já registada (ex.: importada do e-fatura) sem ficheiro: anexa o PDF/foto
+          row.className='qrow done'; ico.textContent='📎';
+          st.textContent='Já existia — ficheiro anexado';
+          anexados++;
+        } else {
+          const bs='font-size:.65rem;padding:.15rem .45rem;color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:Syne,sans-serif;font-weight:700;margin-left:.3rem';
+          st.innerHTML='Já existe'+(mesmoTotal?'':' (total diferente)')
+            +(!dup.storage_path?`<button onclick="anexarDupBatch(${i},this)" style="${bs};background:var(--blue)">📎 Anexar à existente</button>`:'')
+            +`<button onclick="guardarDupBatch(${i},this)" style="${bs};background:var(--gold)">Guardar mesmo assim</button>`;
+          ignoradas++;
+        }
       } else {
         await guardarF(pendingF, true);
         done++;
@@ -3041,7 +3075,8 @@ async function startBatch(){
     if(i < batchFiles.length-1) await new Promise(r=>setTimeout(r,800));
   }
   batchRunning = false;
-  toast('✅ Lote concluído — '+done+' guardadas'+(ignoradas?' · '+ignoradas+' já existiam':'')+(errors?' · '+errors+' erros':''), errors?'error':'success');
+  renderFaturas();
+  toast('✅ Lote concluído — '+done+' guardadas'+(anexados?' · '+anexados+' ficheiro(s) anexado(s) a faturas existentes':'')+(ignoradas?' · '+ignoradas+' já existiam':'')+(errors?' · '+errors+' erros':''), errors?'error':'success');
   calcular();
   setTimeout(()=>{
     batchFiles=[];
@@ -3236,21 +3271,35 @@ Notas:
 // ══════════════════════════════════════════════════
 // BATCH: GUARDAR DUPLICADO MESMO ASSIM
 // ══════════════════════════════════════════════════
-async function guardarFaturaBatch(btn, fatura){
-  btn.disabled = true;
-  btn.textContent = '…';
-  try {
-    await guardarF(fatura, true);
-    const row = btn.closest('.qrow');
-    row.className = 'qrow done';
-    row.querySelector('.q-icon').textContent = '✅';
-    row.querySelector('.q-status').textContent = fatura.fornecedor || 'Guardada';
-    toast('✅ Fatura guardada!', 'success');
-  } catch(e) {
-    btn.disabled = false;
-    btn.textContent = 'Guardar mesmo assim';
-    toast('❌ ' + e.message, 'error');
+let dupBatch={};
+async function guardarDupBatch(i, btn){
+  const d=dupBatch[i]; if(!d) return;
+  btn.disabled=true; btn.textContent='…';
+  try{
+    pendingUploadFile=d.file;
+    await guardarF(d.fatura, true);
+    const row=btn.closest('.qrow');
+    row.className='qrow done';
+    row.querySelector('.q-icon').textContent='✅';
+    row.querySelector('.q-status').textContent=d.fatura.fornecedor||'Guardada';
+    toast('✅ Fatura guardada!','success');
+  }catch(e){
+    pendingUploadFile=null;
+    btn.disabled=false; btn.textContent='Guardar mesmo assim';
+    toast('❌ '+e.message,'error');
   }
+}
+async function anexarDupBatch(i, btn){
+  const d=dupBatch[i]; if(!d) return;
+  btn.disabled=true; btn.textContent='…';
+  if(await uploadToStorage(d.file,d.dup)){
+    const row=btn.closest('.qrow');
+    row.className='qrow done';
+    row.querySelector('.q-icon').textContent='📎';
+    row.querySelector('.q-status').textContent='Ficheiro anexado à fatura existente';
+    renderFaturas();
+    toast('📎 Ficheiro anexado!','success');
+  } else { btn.disabled=false; btn.textContent='📎 Anexar à existente'; toast('❌ Não foi possível anexar o ficheiro','error'); }
 }
 
 
