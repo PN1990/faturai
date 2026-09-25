@@ -1868,12 +1868,16 @@ async function lerCsvEfatura(file){
   const iIva=hdr.findIndex(c=>/\biva\b/i.test(c)&&!/base|total|taxa/i.test(c));
   const iTipo=col(/^tipo/i);
   const iAdq=col(/adquirente|cliente/i);
+  const iEmit=col(/emitente/i);
+  const nifsCsv=new Set();
 
   const efat=new Map();
   rows.slice(hIdx+1).forEach(r=>{
     if(r.some(c=>/anulad/i.test(c))) return;
     const k=(iNum>=0&&chaveFatura(r[iNum])) || r.map(chaveFatura).find(Boolean);
     if(!k) return;
+    const nifEmit=(iEmit>=0&&(r[iEmit].match(/\b\d{9}\b/)||[])[0]) || (k.serie.match(/^(?:N[CD] )?20\d{2}(\d{9})[A-Z]/)||[])[1];
+    if(nifEmit) nifsCsv.add(nifEmit);
     const dt=(iData>=0&&dataISO(r[iData])) || r.map(dataISO).find(Boolean);
     const tipoDoc=iTipo>=0?r[iTipo].trim():'';
     const numTxt=(iNum>=0?r[iNum]:r.find(c=>chaveFatura(c)))||'';
@@ -1886,11 +1890,17 @@ async function lerCsvEfatura(file){
       pref, adquirente:iAdq>=0?r[iAdq].replace(/[<>&"'`]/g,'').trim():''});
   });
   const datas=[...efat.values()].map(x=>x.data).filter(Boolean).sort();
-  return {efat, dMin:datas[0], dMax:datas[datas.length-1], temValores:iBase>=0&&iIva>=0};
+  return {efat, dMin:datas[0], dMax:datas[datas.length-1], temValores:iBase>=0&&iIva>=0, nifsCsv};
+}
+// Impede usar o CSV de um NIF com outro perfil ativo
+function csvDoutroPerfil(nifsCsv){
+  if(!nifsCsv.size||nifsCsv.has(perfilAtivo.nif)) return false;
+  toast(`❌ Este CSV é do NIF ${[...nifsCsv].join(', ')}, mas o perfil ativo é ${perfilAtivo.nif}. Muda de perfil primeiro.`,'error');
+  return true;
 }
 function mapaAppVendas(){
   const app=new Map();
-  faturas.filter(f=>f.perfil_nif===perfilAtivo.nif&&f.tipo!=='compra').forEach(f=>{
+  faturas.filter(f=>f.perfil_nif===perfilAtivo.nif&&(f.tipo==='venda'||(f.tipo==='nota_credito'&&f.nc_tipo!=='compra'))).forEach(f=>{
     const k=chaveFatura(f.numero); if(k) app.set(k.serie+'/'+k.n,f);
   });
   return app;
@@ -1899,8 +1909,9 @@ function mapaAppVendas(){
 async function compararEfatura(file){
   if(!file) return;
   if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
-  const {efat,dMin,dMax}=await lerCsvEfatura(file);
+  const {efat,dMin,dMax,nifsCsv}=await lerCsvEfatura(file);
   if(!efat.size) return toast('❌ Não encontrei números de fatura neste CSV','error');
+  if(csvDoutroPerfil(nifsCsv)) return;
 
   const app=mapaAppVendas();
 
@@ -1973,8 +1984,9 @@ function faturaDeEfatura(x){
 async function importarEfatura(file){
   if(!file) return;
   if(!perfilAtivo) return toast('⚠️ Seleciona um perfil','error');
-  const {efat,temValores}=await lerCsvEfatura(file);
+  const {efat,temValores,nifsCsv}=await lerCsvEfatura(file);
   if(!efat.size) return toast('❌ Não encontrei números de fatura neste CSV','error');
+  if(csvDoutroPerfil(nifsCsv)) return;
   if(!temValores) return toast('❌ O CSV não tem colunas de base e IVA — não dá para importar','error');
   const app=mapaAppVendas();
   const novas=[...efat.values()].filter(x=>!app.has(x.k.serie+'/'+x.k.n))
@@ -2548,11 +2560,23 @@ function showUploadTab(tab, el){
 let _afterDupCallback = null;
 
 function checkDuplicado(f){
+  // vendas/NC não têm NIF de fornecedor: compara por série + número (FR 2026…AL/0038 = 2026…AL/38)
+  const emitida=x=>x.tipo==='venda'||(x.tipo==='nota_credito'&&x.nc_tipo!=='compra');
+  const k=emitida(f)?chaveFatura(f.numero):null;
+  if(k){
+    const d=faturas.find(x=>{
+      if(x.perfil_nif!==f.perfil_nif||!emitida(x)) return false;
+      const kx=chaveFatura(x.numero);
+      return kx&&kx.serie===k.serie&&kx.n===k.n;
+    });
+    if(d) return d;
+  }
   if(!f.numero||f.numero==='—'||!f.nif||f.nif==='—') return null;
+  const norm=s=>String(s||'').replace(/\s+/g,'').toUpperCase();
   return faturas.find(x =>
     x.perfil_nif === f.perfil_nif &&
-    x.nif === f.nif &&
-    x.numero === f.numero
+    normNif(x.nif) === normNif(f.nif) &&
+    norm(x.numero) === norm(f.numero)
   ) || null;
 }
 
