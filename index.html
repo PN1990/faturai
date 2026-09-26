@@ -808,6 +808,7 @@ select{background:var(--bg);border:1px solid var(--border);border-radius:8px;pad
         </div>
       </div>
     </div>
+    <div id="semDataFaturas" class="info-box gold" style="display:none;margin-bottom:1.1rem"></div>
     <div class="card">
       <div class="card-header">
         <span class="card-title">📋 Faturas Guardadas</span>
@@ -1478,6 +1479,8 @@ function abrirEdicao(id){
   ['fornecedor','nif','numero','data','base_5','iva_5','base_12','iva_12','base_22','iva_22','base_isenta','total','nota'].forEach(k=>{
     const el=document.getElementById('ef_'+k);if(el)el.value=f[k]??'';
   });
+  const efData=document.getElementById('ef_data');
+  if(efData){ efData.value=normalizarData(f.data)||''; efData.placeholder='DD/MM/AAAA'; }
   const estrangCheck=document.getElementById('ef_estrangeira');
   if(estrangCheck) estrangCheck.checked=!!f.estrangeira;
   toggleEditEstrang(!!f.estrangeira);
@@ -1492,6 +1495,9 @@ function abrirEdicao(id){
   document.getElementById('modalEdit').classList.add('show');
 }
 async function guardarEdicao(){
+  const dataOk=normalizarData(document.getElementById('ef_data').value);
+  if(!dataOk){ document.getElementById('ef_data').focus(); return toast('⚠️ Escreve uma data válida (DD/MM/AAAA)','error'); }
+  document.getElementById('ef_data').value=dataOk;
   const efEstrang=document.getElementById('ef_estrangeira')?.checked||false;
   const upd={
     tipo:editTipo,
@@ -1885,10 +1891,12 @@ function verificarSequencia(ano,trim){
     html.push(`⚠️ <strong>Faltam números na sequência de vendas:</strong> ${faltas.join(', ')}. Carrega essas faturas antes de submeter (ou confirma que foram anuladas).`);
   }
   if(semData.length){
-    const lista=semData.map(f=>`${String(f.fornecedor||'?').replace(/[<>&"'`]/g,'')} (${String(f.numero||'').replace(/[<>&"'`]/g,'')}, ${fmt(f.total)})`).join('; ');
+    const lista=semData.map(f=>`<a href="#" onclick="abrirEdicao(${+f.id});return false" style="color:var(--blue);font-weight:700">✏️ ${String(f.fornecedor||'?').replace(/[<>&"'`]/g,'')} (${String(f.numero||'').replace(/[<>&"'`]/g,'')}, ${fmt(f.total)})</a>`).join(' · ');
     avisosPeriodo.push(`${semData.length} fatura(s) sem data válida — não entram em nenhum trimestre`);
-    html.push(`⚠️ <strong>${semData.length} fatura(s) sem data válida</strong> — não contam em nenhum trimestre. Corrige a data com ✏️: ${lista}.`);
+    html.push(`⚠️ <strong>${semData.length} fatura(s) sem data válida</strong> — não contam em nenhum trimestre. Toca para meter a data: ${lista}`);
   }
+  const sd=document.getElementById('semDataFaturas');
+  if(sd){ sd.style.display=semData.length?'':'none'; sd.innerHTML=semData.length?html[html.length-1]:''; }
   if(!html.length){ el.style.display='none'; return; }
   el.style.display='';
   el.innerHTML=html.join('<br><br>');
