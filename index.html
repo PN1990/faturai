@@ -1026,6 +1026,35 @@ let faturas=[], perfis=[], perfilAtivo=null;
 let tipoAtual='venda', pendingF=null, pendingLinhas=[], editingId=null, editTipo='venda', editNcTipo='venda';
 // Strip country prefix (PT, ES, FR…) from NIF for comparison
 function normNif(n){ return n ? String(n).replace(/^[A-Za-z]{2}/,'').trim() : n; }
+// Venda só se foi emitida com o NIF do perfil; na dúvida é compra (recibos sem NIF do cliente legível)
+function tipoPorNif(p){
+  if(p.e_nota_credito) return 'nota_credito';
+  const meu=normNif(perfilAtivo?.nif);
+  if(p.nif_fornecedor && normNif(p.nif_fornecedor)===meu) return 'venda';
+  if(p.nif_cliente && normNif(p.nif_cliente)===meu) return 'compra';
+  return (p.nif_fornecedor||p.nif_cliente) ? 'compra' : 'venda';
+}
+// Converte datas lidas pela IA para DD/MM/AAAA; devolve null se não for uma data real
+function normalizarData(s){
+  s=String(s||'').trim();
+  let d,m,y,r;
+  if((r=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2}|\d{4})$/))) [,d,m,y]=r;
+  else if((r=s.match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/))) [,y,m,d]=r;
+  else return null;
+  if(y.length===2) y='20'+y;
+  const dt=new Date(+y,+m-1,+d);
+  if(dt.getFullYear()!==+y||dt.getMonth()!==+m-1||dt.getDate()!==+d||+y<2000) return null;
+  return `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${y}`;
+}
+function pedirData(f){
+  let v=normalizarData(f.data);
+  while(!v){
+    const r=prompt(`Não consegui ler a data da fatura de ${f.fornecedor||'?'} (${f.numero||'sem número'}, ${fmt(f.total)}).\n\nEscreve a data (DD/MM/AAAA) ou cancela para confirmar depois:`,'');
+    if(r===null) return '—';
+    v=normalizarData(r);
+  }
+  return v;
+}
 let pendingUploadFile=null; // ficheiro aguardando upload após guardarF
 let filterTipo='todos', editingPerfilNif=null;
 let session=null, dadosCarregados=false;
@@ -1848,10 +1877,23 @@ function verificarSequencia(ano,trim){
       faltas.push(b-a===2 ? `${serie}/${pad4(a+1)}` : `${serie}/${pad4(a+1)} a ${pad4(b-1)}`);
     }
   }
-  if(!faltas.length){ el.style.display='none'; return; }
+  const semData=faturas.filter(f=>f.perfil_nif===perfilAtivo.nif&&!normalizarData(f.data));
+  avisosPeriodo=[];
+  const html=[];
+  if(faltas.length){
+    avisosPeriodo.push('Faltam números na sequência de vendas: '+faltas.join(', '));
+    html.push(`⚠️ <strong>Faltam números na sequência de vendas:</strong> ${faltas.join(', ')}. Carrega essas faturas antes de submeter (ou confirma que foram anuladas).`);
+  }
+  if(semData.length){
+    const lista=semData.map(f=>`${String(f.fornecedor||'?').replace(/[<>&"'`]/g,'')} (${String(f.numero||'').replace(/[<>&"'`]/g,'')}, ${fmt(f.total)})`).join('; ');
+    avisosPeriodo.push(`${semData.length} fatura(s) sem data válida — não entram em nenhum trimestre`);
+    html.push(`⚠️ <strong>${semData.length} fatura(s) sem data válida</strong> — não contam em nenhum trimestre. Corrige a data com ✏️: ${lista}.`);
+  }
+  if(!html.length){ el.style.display='none'; return; }
   el.style.display='';
-  el.innerHTML=`⚠️ <strong>Faltam números na sequência de vendas:</strong> ${faltas.join(', ')}. Carrega essas faturas antes de submeter (ou confirma que foram anuladas).`;
+  el.innerHTML=html.join('<br><br>');
 }
+let avisosPeriodo=[];
 
 function parseCSV(txt,d){
   const rows=[]; let row=[], cell='', q=false;
@@ -2192,8 +2234,7 @@ async function exportDPIVAXML(){
   const a=ultimoApuramento;
   if(!a) return;
   const avisos=[];
-  const seq=document.getElementById('seqAviso');
-  if(seq&&seq.style.display!=='none') avisos.push('• '+seq.textContent.replace(/^⚠️\s*/,'').split('. Carrega')[0]);
+  avisosPeriodo.forEach(t=>avisos.push('• '+t));
   if(!await sbGetConfig(`efat_cmp_${a.ano}_${a.trim}`,'')) avisos.push('• Ainda não comparaste este trimestre com o CSV do e-fatura (🔎 Comparar com e-fatura).');
   if(avisos.length && !confirm('Antes de gerar o XML:\n\n'+avisos.join('\n')+'\n\nGerar mesmo assim?')) return;
   if(Math.abs(a.vb12)>0.005||Math.abs(a.vis)>0.005){
@@ -2888,19 +2929,35 @@ let batchFiles = [];
 let batchRunning = false;
 let modalResolver = null;
 
-function loadBatchFiles(files){
-  batchFiles = Array.from(files);
-  const wrap = document.getElementById('batchQueueWrap');
-  wrap.style.display = '';
-  document.getElementById('batchProgress').textContent = '0 / '+batchFiles.length;
-  document.getElementById('batchBar').style.width = '0%';
-  document.getElementById('btnStartBatch').style.display = '';
-  document.getElementById('batchQueue').innerHTML = batchFiles.map((f,i)=>`
+let batchConcluido=false;
+// acrescentar=true (câmara): junta à fila em vez de a substituir, para tirar várias fotos seguidas
+function loadBatchFiles(files, acrescentar=false){
+  if(batchRunning) return toast('⏳ Espera que o lote atual termine','error');
+  const novos=Array.from(files);
+  batchFiles=(acrescentar&&!batchConcluido)?batchFiles.concat(novos):novos;
+  batchConcluido=false;
+  renderFilaBatch();
+}
+function renderFilaBatch(){
+  const wrap=document.getElementById('batchQueueWrap');
+  const cam=document.getElementById('btnBatchCamera');
+  if(cam) cam.textContent=batchFiles.length?`📷 Tirar mais uma foto (${batchFiles.length} na fila)`:'📷 Tirar foto com a câmara';
+  if(!batchFiles.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  document.getElementById('batchProgress').textContent='0 / '+batchFiles.length;
+  document.getElementById('batchBar').style.width='0%';
+  document.getElementById('btnStartBatch').style.display='';
+  document.getElementById('batchQueue').innerHTML=batchFiles.map((f,i)=>`
     <div class="qrow waiting" id="qrow_${i}">
       <div class="q-icon" id="qico_${i}">⏳</div>
-      <div class="q-name">${f.name}</div>
-      <div class="q-status" id="qst_${i}">À espera</div>
+      <div class="q-name">${String(f.name).replace(/[<>&"'`]/g,'')}</div>
+      <div class="q-status" id="qst_${i}">À espera <button onclick="removerDaFila(${i})" title="Tirar da fila" style="margin-left:.3rem;border:none;background:none;color:var(--danger);cursor:pointer;font-size:.8rem">✕</button></div>
     </div>`).join('');
+}
+function removerDaFila(i){
+  if(batchRunning) return;
+  batchFiles.splice(i,1);
+  renderFilaBatch();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -2921,10 +2978,9 @@ window.addEventListener('DOMContentLoaded', () => {
     reader.onload = function(e){
       const arr = new Uint8Array(e.target.result);
       const blob = new Blob([arr], {type: file.type||'image/jpeg'});
-      const fresh = new File([blob], file.name||'camera.jpg', {type: blob.type});
-      const dt = new DataTransfer();
-      dt.items.add(fresh);
-      loadBatchFiles(dt.files);
+      const n = batchConcluido ? 1 : batchFiles.length+1;
+      const fresh = new File([blob], `foto_${n}.jpg`, {type: blob.type});
+      loadBatchFiles([fresh], true);
     };
     reader.readAsArrayBuffer(file);
     bci.value='';
@@ -2963,9 +3019,7 @@ async function startBatch(){
       const p = await chamarIA([cb,{type:'text',text:buildPrompt('fatura')}],1000);
 
       // Auto-detect tipo por ficheiro
-      tipoAtual = 'venda';
-      if(p.e_nota_credito){ tipoAtual='nota_credito'; }
-      else if(p.nif_cliente && perfilAtivo.nif && normNif(p.nif_cliente)===normNif(perfilAtivo.nif)){ tipoAtual='compra'; }
+      tipoAtual = tipoPorNif(p);
 
       pendingF = {
         tipo:tipoAtual, perfil_nif:perfilAtivo.nif,
@@ -2981,6 +3035,8 @@ async function startBatch(){
         iva_estrangeira:(+p.iva_estrangeira||0)>0?(+p.iva_estrangeira):(+p.base_estrangeira||0)*0.22,
         total:+p.total||0, prestacoes:0, ficheiro:f.name
       };
+      pendingF.data = pedirData(pendingF);
+      if(pendingF.data==='—') pendingF.nota = '⚠️ Data por confirmar';
       // Auto-corrigir IVA 4%: a IA pode usar 5% (taxa continental) em vez de 4% (Madeira)
       ajustarIva4(pendingF);
       recalcTotais(pendingF);
@@ -3075,12 +3131,14 @@ async function startBatch(){
     if(i < batchFiles.length-1) await new Promise(r=>setTimeout(r,800));
   }
   batchRunning = false;
+  batchConcluido = true;
   renderFaturas();
   toast('✅ Lote concluído — '+done+' guardadas'+(anexados?' · '+anexados+' ficheiro(s) anexado(s) a faturas existentes':'')+(ignoradas?' · '+ignoradas+' já existiam':'')+(errors?' · '+errors+' erros':''), errors?'error':'success');
   calcular();
   setTimeout(()=>{
+    if(!batchConcluido) return; // entretanto começou uma nova fila
     batchFiles=[];
-    document.getElementById('batchQueueWrap').style.display='none';
+    renderFilaBatch();
     document.getElementById('batchFileInput').value='';
   }, 4000);
 }
@@ -3264,7 +3322,8 @@ INSTRUCAO: Este PDF tem FATURA e NOTA DE CREDITO. Extrai SO a NOTA DE CREDITO (s
 
 Notas:
 - e_nota_credito=true se o titulo/cabecalho do documento for "Nota de credito" ou "Credit Note" (documento inteiramente uma NC, nao uma fatura com NC incorporada). Neste caso os valores devem ser positivos (ignora o sinal negativo do PDF).
-- nif_cliente = NIF do DESTINATARIO/CLIENTE da fatura (o que recebe a fatura, nao o fornecedor). Deixa null se nao estiver visivel.`;
+- nif_cliente = NIF do DESTINATARIO/CLIENTE da fatura (o que recebe a fatura, nao o fornecedor). Deixa null se nao estiver visivel.
+- data = data de emissao da fatura no formato DD/MM/AAAA. Se nao conseguires ler a data, usa null (nunca devolvas o texto "DD/MM/AAAA").`;
 }
 
 
