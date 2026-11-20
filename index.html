@@ -1886,6 +1886,14 @@ function verificarSequencia(ano,trim){
   const semData=faturas.filter(f=>f.perfil_nif===perfilAtivo.nif&&!normalizarData(f.data));
   avisosPeriodo=[];
   const html=[];
+  // Trimestre sem vendas, mas com vendas noutros trimestres do ano: provavelmente faltam faturas no fim da série
+  const vendasAno=faturas.filter(f=>f.perfil_nif===perfilAtivo.nif&&f.tipo==='venda'&&normalizarData(f.data)&&+f.data.split('/')[2]===ano);
+  if(vendasAno.length && !vendasAno.some(f=>meses.includes(+f.data.split('/')[1]))){
+    const ult=vendasAno.filter(f=>+f.data.split('/')[1]<meses[0]).sort((a,b)=>dataISO(a.data).localeCompare(dataISO(b.data))).pop();
+    const ref=ult?` A última fatura de venda carregada é a ${String(ult.numero).replace(/[<>&"'`]/g,'')}, de ${ult.data}.`:'';
+    avisosPeriodo.push('Não há faturas de venda neste trimestre.'+ref);
+    html.push(`⚠️ <strong>Não há faturas de venda neste trimestre.</strong>${ref} Se houve estadias, importa as faturas em <strong>Faturas → 📥 e-fatura → 📤 Vendas</strong>.`);
+  }
   if(faltas.length){
     avisosPeriodo.push('Faltam números na sequência de vendas: '+faltas.join(', '));
     html.push(`⚠️ <strong>Faltam números na sequência de vendas:</strong> ${faltas.join(', ')}. Carrega essas faturas antes de submeter (ou confirma que foram anuladas).`);
